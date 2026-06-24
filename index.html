@@ -3596,6 +3596,17 @@ function renderRailEtiketler(){
       '</div>';
   }).join('');
 }
+// Etiket bolumu basligina tiklayinca ac/kapa. Filtre aktif olsa bile KAPANABILMELI
+// (eskiden filtre varken kapanmiyordu — kullanici sikayet etti, duzeltildi).
+function etiketBolumToggle(){
+  _etiketBolumAcik=!_etiketBolumAcik;
+  // Kapatiliyorsa ve bir filtre aktifse, filtreyi de temizle ki liste gercekten kapansin
+  if(!_etiketBolumAcik && _aktifEtiketFiltre){
+    _aktifEtiketFiltre=null;
+    renderList();
+  }
+  renderEtiketBolum();
+}
 function etiketFiltreTemizle(){
   _aktifEtiketFiltre=null;
   renderEtiketBolum();

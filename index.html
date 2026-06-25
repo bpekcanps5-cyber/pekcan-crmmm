@@ -734,10 +734,12 @@
   .fwd-chip{display:inline-flex;align-items:center;gap:6px;background:var(--brand-soft);color:var(--brand);font-size:12.5px;font-weight:600;padding:5px 11px;border-radius:16px}
   .fwd-chip b{cursor:pointer;font-size:15px;line-height:1;font-weight:400}
   .fwd-chip b:hover{color:var(--text)}
-  /* Secim modu: mesajdaki secim kutusu */
-  .sec-kutu{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;border:2px solid var(--border);margin-right:8px;cursor:pointer;font-size:13px;font-weight:800;color:#fff;vertical-align:middle;flex-shrink:0;transition:all .12s}
+  /* Secim modu: secim kutusu — WhatsApp gibi baloncugun SOL DIKEY ORTASINDA.
+     absolute konum: baloncuk yapisini bozmaz, kutu disarida solda ortada durur. */
+  .sec-kutu{position:absolute;left:-34px;top:50%;transform:translateY(-50%);display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;border:2px solid var(--border);cursor:pointer;font-size:13px;font-weight:800;color:#fff;flex-shrink:0;transition:all .12s;background:var(--panel);z-index:2}
   .sec-kutu.dolu{background:var(--brand);border-color:var(--brand)}
-  .msg.secim-modu{cursor:pointer}
+  /* secim modunda mesaja sol margin ver ki kutu icin yer acilsin (baloncuk sola kaymasin) */
+  .msg.secim-modu{cursor:pointer;margin-left:38px}
   /* Toast bildirim */
   #toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:13px 22px;border-radius:13px;font-size:13.5px;font-weight:600;box-shadow:var(--shadow-lg);z-index:300;opacity:0;transition:all .3s cubic-bezier(.2,.8,.2,1);pointer-events:none;display:flex;align-items:center;gap:9px}
   #toast.show{transform:translateX(-50%) translateY(0);opacity:1}
@@ -3221,7 +3223,7 @@ function openChat(jid){
   // DB'den eksik mesajlari kontrol et (canli kacan mesaji yakalamak icin).
   baslatTazeleme(jid);
   const gd=document.getElementById('groupDesc');
-  if(c.isGroup&&c.description){
+  if(c.isGroup && c.description && c.description.trim()){
     gd.style.display='block';
     const dt=document.getElementById('groupDescText');
     dt.textContent=c.description;
@@ -3231,7 +3233,14 @@ function openChat(jid){
     const long=c.description.length>120 || (c.description.match(/\n/g)||[]).length>=2;
     tog.style.display=long?'inline-block':'none';
     tog.textContent='Devamını gör';
-  } else gd.style.display='none';
+  } else {
+    // Aciklama YOK: hem gizle hem ICERIGI TEMIZLE (yoksa onceki grubun aciklamasi
+    // DOM'da kalip gorunebiliyordu). Bu, "aciklamasiz grupta baskasinin aciklamasi" bug'inin
+    // kesin cozumu — element bos olsun, sadece display:none yetmiyor olabilir.
+    gd.style.display='none';
+    const dt=document.getElementById('groupDescText');
+    if(dt) dt.textContent='';
+  }
   document.getElementById('offlineBanner').style.display=connected?'none':'block';
   // FLAS ONLEME: bellekte mesaj VARSA hemen ciz (bos kare gorunmesin).
   // Bellekte mesaj YOKSA bos beyaz birakmak yerine kisa "yukleniyor" goster;
@@ -3862,10 +3871,16 @@ function renderMessages(c, searchQ){
       else if(['zip','rar','7z'].includes(ext)){ dcolor='#b07b2e'; dlabel='ARŞİV'; }
       else if(ext) dlabel=ext.toUpperCase().slice(0,4);
       const icon = m.thumb
-        ? '<span class="doc-thumb" style="background-image:url('+esc(m.thumb)+')" onclick="event.preventDefault();event.stopPropagation();belgeOnizle(\''+esc(m.mediaUrl)+'\',\''+esc(ext)+'\',\''+esc(m.thumb)+'\')"></span>'
+        ? '<span class="doc-thumb" style="background-image:url('+esc(m.thumb)+')"></span>'
         : '<span class="doc-icon" style="background:'+dcolor+'">'+docSvg()+'<span class="doc-ext">'+dlabel+'</span></span>';
       const dlUrl = esc(m.mediaUrl) + '?name=' + encodeURIComponent(fname);
-      body='<a class="msg-doc'+(m.thumb?' has-thumb':'')+'" href="'+dlUrl+'" download="'+esc(fname)+'">'+icon+'<span class="doc-info"><span class="dn">'+hlight(fname,searchQ)+'</span><span class="dm">İndirmek için tıkla</span></span></a>';
+      // Belgeye TIKLAYINCA: dosya inmisse ic icerigi yeni sekmede ac (PDF/resim icini gor),
+      // inmemisse "henuz indirilmedi" uyari. Alt satirda ayri "indir" baglantisi.
+      const acHandler = m.mediaUrl
+        ? 'onclick="event.preventDefault();belgeOnizle(\''+esc(m.mediaUrl)+'\',\''+esc(ext)+'\',\''+esc(m.thumb||'')+'\')"'
+        : 'onclick="event.preventDefault();showToast(\'Belge henüz indirilmedi, birazdan tekrar deneyin.\')"';
+      const altYazi = m.mediaUrl ? 'Görüntülemek için tıkla' : 'İndiriliyor…';
+      body='<a class="msg-doc'+(m.thumb?' has-thumb':'')+'" href="'+dlUrl+'" '+acHandler+' style="cursor:pointer">'+icon+'<span class="doc-info"><span class="dn">'+hlight(fname,searchQ)+'</span><span class="dm">'+altYazi+'</span>'+(m.mediaUrl?'<a class="doc-indir" href="'+dlUrl+'" download="'+esc(fname)+'" onclick="event.stopPropagation()" style="font-size:11.5px;color:var(--accent);text-decoration:none;display:inline-block;margin-top:2px">⬇ İndir</a>':'')+'</span></a>';
       // belgeye yazilan ACIKLAMA (caption) varsa dosyanin altinda goster
       if(m.caption){ body+='<div class="caption">'+hlight(m.caption,searchQ,m.mentions)+'</div>'; }
     } else if(m.kind==='contact'&&m.contact){
@@ -4907,20 +4922,25 @@ async function doSendFiles(){
   const caption=document.getElementById('sendFileCaption').value.trim();
   document.getElementById('sendFileModal').classList.remove('show');
   if(!files.length||!activeJid) return;
+  // KRITIK: hedef sohbeti BURADA sabitle! Yukleme sirasinda (await) kullanici baska
+  // sohbete gecerse veya activeJid degisirse, dosya YANLIS GRUBA gidiyordu. Artik
+  // gonderim hep bu sabit 'hedefJid'e yapilir, yukleme bitene kadar degismez.
+  const hedefJid = activeJid;
+  const hedefAd = (chats[hedefJid] && chats[hedefJid].name) ? chats[hedefJid].name : '';
   for(let i=0;i<files.length;i++){
     const file=files[i];
     // aciklama sadece ilk dosyaya eklensin (WhatsApp da boyle yapar)
-    const q=new URLSearchParams({jid:activeJid, name:file.name, mime:file.type||'application/octet-stream', agent:benimAdim()});
+    const q=new URLSearchParams({jid:hedefJid, name:file.name, mime:file.type||'application/octet-stream', agent:benimAdim()});
     if(authToken) q.set('token', authToken);
     if(caption && i===0) q.set('caption', caption);
     const boyutMB=(file.size/1048576).toFixed(1);
-    showToast('📎 '+file.name+' gönderiliyor… ('+boyutMB+' MB)');
+    showToast('📎 '+file.name+(hedefAd?(' → '+hedefAd):'')+' gönderiliyor… ('+boyutMB+' MB)');
     try{
       const r=await fetch('/upload?'+q.toString(), {method:'POST', headers:{'Content-Type':'application/octet-stream'}, body:file});
       let j;
       try{ j=await r.json(); }catch(e){ j={ok:false, error:'sunucu yanıtı okunamadı'}; }
       if(!r.ok || !j.ok){ showToast('⚠️ '+file.name+' gönderilemedi: '+(j.error||('hata '+r.status))); }
-      else { showToast('✓ '+file.name+' gönderildi'); }
+      else { showToast('✓ '+file.name+(hedefAd?(' → '+hedefAd):'')+' gönderildi'); }
     }catch(err){ showToast('⚠️ Yükleme hatası: '+err.message); }
   }
 }

@@ -2205,7 +2205,9 @@ function retryGroupName(jid) {
         if (meta?.subject && meta.subject.trim()) {
           ch.name = meta.subject.trim();
           if (meta.participants) ch.memberCount = meta.participants.length;
-          if (meta.desc) ch.description = meta.desc;
+          // ACIKLAMA: desc varsa onu, YOKSA bos string ata. (Eskiden "if(meta.desc)" idi;
+          // aciklamasiz grupta eski/baska grubun aciklamasi kaliyordu — bug buydu.)
+          ch.description = (meta.desc && meta.desc.trim()) ? meta.desc.trim() : '';
           if (meta.subject) grupAdlari.set(jid, meta.subject.trim()); // bellege de yaz
           broadcastHat('ofis', { type: 'message', jid, chat: stripRaw(ch) });
           console.log(`🔤 grup adi geldi (deneme ${i + 1}): ${ch.name}`);
@@ -2514,6 +2516,9 @@ function stripRaw(chat) {
   const recent = chat.messages.length > 60 ? chat.messages.slice(-60) : chat.messages;
   return {
     ...chat,
+    // ACIKLAMA her zaman TANIMLI gitsin: undefined ise panel "eskisini koru" deyip
+    // baska grubun aciklamasini gosteriyordu. Grup ise mevcut deger veya '', grup degilse ''.
+    description: (chat.isGroup ? (chat.description || '') : ''),
     messages: recent.map(({ raw, key, ...rest }) => rest),
     atananlar: chatAssignments.get(chat.jid) || [], // bu gruba atanan ekip uyeleri
     etiketler: chatLabels.get(chat.jid) || [],      // bu gruba bagli etiket id'leri
@@ -2963,6 +2968,27 @@ async function startWA(lineId = 'ofis') {
                                   // false = baglaninca sadece yakin gecmis gelir, canli akisa hemen gecer.
     markOnlineOnConnect: false,   // panel "cevrimici" gorunmesin — cevrimici iken WhatsApp bazi gelen
                                   // mesaj bildirimlerini farkli/eksik iletebiliyor. false daha guvenilir akis verir.
+    // ↓↓↓ BAGLANTI KARARLILIGI (surekli kopma + "Precondition Required" + sendRetryRequest hatasi icin) ↓↓↓
+    // KRITIK: getMessage — WhatsApp bir mesaji cozemeyip "tekrar gonder" (retry) isterse,
+    // Baileys o mesaji bizden ister. Bu fonksiyon yoksa retry basarisiz olup BAGLANTI DUSUYOR.
+    // Bellekteki mesaj deposundan ilgili mesaji dondururuz -> retry basarili -> baglanti kopmaz.
+    getMessage: async (key) => {
+      try {
+        const jid = key.remoteJid;
+        const C = hatChats(lineId);
+        const chat = C && C.get ? C.get(jid) : null;
+        if (chat && chat.messages) {
+          const m = chat.messages.find(x => x && x.id === key.id);
+          if (m && m._raw) return m._raw.message || undefined;
+        }
+      } catch (e) {}
+      return undefined; // bulunamazsa undefined (Baileys bos mesajla devam eder, kopmaz)
+    },
+    retryRequestDelayMs: 350,       // retry istekleri arasi bekleme (cok hizli retry WhatsApp'i kizdirir)
+    maxMsgRetryCount: 3,            // bir mesaj icin en fazla 3 retry (sonsuz retry dongüsünü onler)
+    connectTimeoutMs: 60000,        // baglanti kurma zaman asimi (yavas agda kopmasin)
+    keepAliveIntervalMs: 15000,     // 15 sn'de bir "hayatta miyim" sinyali -> olu baglanti erken yakalanir
+    emitOwnEvents: false,           // kendi gonderdigimiz mesajlari geri event olarak alma (gereksiz yuk)
   });
   line.sock = sock;   // hattin kendi soketi (HER hat icin dogru — bunu kullan)
   // KRITIK: global 'waSock' koprusu SADECE ofis hatti icin guncellensin.

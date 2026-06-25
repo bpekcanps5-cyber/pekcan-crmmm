@@ -521,23 +521,34 @@
   /* ofis ekibi rozeti: küçük yeşil yuvarlak içinde kalkan ikonu (şık, kurumsal) */
   .ofis-rozet{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--brand);color:#fff;flex-shrink:0;font-size:9px}
   .ofis-rozet svg{width:10px;height:10px}
-  /* EKİP ÜYESİ adı (hem giden hem gelen): şık pill rozet — kendi satırında, isim kadar geniş */
-  .msg .sender-name.ofis-uye,
+  /* ── İKİ FARKLI EKİP ROZETİ (karışmasın) ── */
+  /* Ortak: ikon yuvarlağı */
+  .panel-rozet,.ofis-rozet{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;color:#fff;flex-shrink:0}
+  .panel-rozet svg,.ofis-rozet svg{width:10px;height:10px}
+  .panel-rozet{background:var(--brand)}      /* PANEL kullanıcısı = marka yeşili + kalkan */
+  .ofis-rozet{background:#3b82f6}             /* GRUPTAKİ ofis kişisi = mavi + bina */
+
+  /* 1) PANEL KULLANICISI adı (giden mesaj): yeşil pill, blok satır (mesaj altına geçer) */
   .msg .sender-name.team-name{
-    display:inline-flex;align-items:center;gap:5px;width:fit-content;max-width:100%;
-    padding:3px 10px 3px 4px;border-radius:20px;
-    background:linear-gradient(90deg,color-mix(in srgb,var(--brand) 22%,transparent),color-mix(in srgb,var(--brand) 8%,transparent));
-    border:1px solid color-mix(in srgb,var(--brand) 35%,transparent);
-    font-size:13px;font-weight:700;
-    color:var(--ink) !important;
+    display:flex;align-items:center;gap:5px;width:fit-content;max-width:100%;
+    padding:3px 11px 3px 4px;border-radius:20px;margin-bottom:6px;
+    background:linear-gradient(90deg,color-mix(in srgb,var(--brand) 24%,transparent),color-mix(in srgb,var(--brand) 8%,transparent));
+    border:1px solid color-mix(in srgb,var(--brand) 38%,transparent);
+    font-size:13px;font-weight:700;color:var(--ink) !important;
   }
-  /* koyu temalarda ink koyu olabilir; metni parlak tut */
-  html[data-skin] .msg .sender-name.ofis-uye, html[data-skin] .msg .sender-name.team-name,
-  html[data-theme="dark"] .msg .sender-name.ofis-uye, html[data-theme="dark"] .msg .sender-name.team-name{
-    color:var(--text) !important;
+  /* 2) GRUPTAKİ OFİS KİŞİSİ adı (gelen mesaj): mavi pill, blok satır */
+  .msg .sender-name.ofis-uye{
+    display:flex;align-items:center;gap:5px;width:fit-content;max-width:100%;
+    padding:3px 11px 3px 4px;border-radius:20px;margin-bottom:6px;
+    background:linear-gradient(90deg,rgba(59,130,246,.20),rgba(59,130,246,.06));
+    border:1px solid rgba(59,130,246,.38);
+    font-size:13px;font-weight:700;color:#1d4ed8 !important;
   }
-  /* giden mesaj kendi balonunda; ad rozeti sola yaslı kalsın */
-  .msg.out .sender-name.team-name{margin-left:0}
+  /* koyu temalarda metni parlak tut */
+  html[data-skin] .msg .sender-name.team-name,
+  html[data-theme="dark"] .msg .sender-name.team-name{ color:var(--text) !important; }
+  html[data-skin] .msg .sender-name.ofis-uye,
+  html[data-theme="dark"] .msg .sender-name.ofis-uye{ color:#93c5fd !important; }
   /* *kalin* metin: renkli ve kalin (WhatsApp tarzi vurgu) */
   /* *kalin* metin: renkli, canli, kalin (animasyonsuz, sabit) */
   .md-bold{
@@ -4264,16 +4275,18 @@ function renderMessages(c, searchQ){
     let name='';
     if(isimGoster){
       const sn=esc(m.sender);
-      // OFIS EKIBI ROZETI: adinda PEKCAN/PKC turevleri gecen kisiler ofis ekibidir.
-      // (Sunucudan gelen senderOfis bayragi VEYA isim icerigi — ikisinden biri yeterli.)
-      // GIDEN mesaj (fromMe) = panelden atilmis = KESIN ekip uyesi -> her zaman rozet.
-      const ofisMu = m.fromMe || m.senderOfis || ofisIsmiMi(m.sender);
-      const ofisRozet = ofisMu ? '<span class="ofis-rozet" title="Ofis ekibi / Panel kullanıcısı"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></span>' : '';
+      // İKİ FARKLI DURUM (karışmasın):
+      //  1) GİDEN mesaj (fromMe) = PANEL KULLANICISI (sen/ekip, panelden yazdı) -> kalkan rozeti, "team-name"
+      //  2) GELEN mesaj ama adı Pekcan/ofis = gruptaki ofis kişisi (TELEFONDAN yazdı) -> bina rozeti, "ofis-uye"
+      // İkisi AYRI görünür: panel kullanıcısı ≠ gruptaki ofis ismi.
       if(m.fromMe){
-        // GIDEN ekip mesaji: ad sabit etiket (tiklanmaz — bir WhatsApp kisisi degil, ekip uyesi)
-        name='<div class="sender-name team-name" style="color:'+colorFor(m.sender)+'">'+ofisRozet+sn+'</div>';
+        // PANEL KULLANICISI: kalkan ikonlu yeşil pill (tıklanmaz — WhatsApp kişisi değil, ekip üyesi)
+        const panelRozet='<span class="panel-rozet" title="Panel kullanıcısı"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></span>';
+        name='<div class="sender-name team-name">'+panelRozet+sn+'</div>';
       } else {
-        // GELEN grup mesaji: tiklayinca gonderen bilgisi acilir
+        // GELEN grup mesajı: ofis ekibinden mi? (adı Pekcan vb. VEYA sunucu işaretledi)
+        const ofisMu = m.senderOfis || ofisIsmiMi(m.sender);
+        const ofisRozet = ofisMu ? '<span class="ofis-rozet" title="Ofis ekibi (gruptan)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg></span>' : '';
         const sj=esc(m.senderJid||'');
         name='<div class="sender-name clickable'+(ofisMu?' ofis-uye':'')+'" style="color:'+colorFor(m.sender)+'" onclick="showSenderInfo(\''+sj+'\',\''+sn.replace(/'/g,"\\'")+'\')">'+ofisRozet+sn+'</div>';
       }

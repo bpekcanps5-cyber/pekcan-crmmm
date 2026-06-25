@@ -890,12 +890,16 @@
   .fwd-chip{display:inline-flex;align-items:center;gap:6px;background:var(--brand-soft);color:var(--brand);font-size:12.5px;font-weight:600;padding:5px 11px;border-radius:16px}
   .fwd-chip b{cursor:pointer;font-size:15px;line-height:1;font-weight:400}
   .fwd-chip b:hover{color:var(--text)}
-  /* Secim modu: secim kutusu — WhatsApp gibi baloncugun SOL DIKEY ORTASINDA.
-     absolute konum: baloncuk yapisini bozmaz, kutu disarida solda ortada durur. */
-  .sec-kutu{position:absolute;left:-34px;top:50%;transform:translateY(-50%);display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;border:2px solid var(--border);cursor:pointer;font-size:13px;font-weight:800;color:#fff;flex-shrink:0;transition:all .12s;background:var(--panel);z-index:2}
-  .sec-kutu.dolu{background:var(--brand);border-color:var(--brand)}
-  /* secim modunda mesaja sol margin ver ki kutu icin yer acilsin (baloncuk sola kaymasin) */
-  .msg.secim-modu{cursor:pointer;margin-left:38px}
+  /* SEÇİM DAİRESİ — WhatsApp gibi baloncuğun SOL DIKEY ORTASINDA, HER ZAMAN var.
+     Normalde soluk; mesajın üstüne gelince (hover) veya seçiliyken belirginleşir. */
+  .sec-kutu{position:absolute;left:-32px;top:50%;transform:translateY(-50%);display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;border:2px solid var(--border);cursor:pointer;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;transition:all .12s;background:var(--panel);z-index:2;opacity:.35}
+  .sec-kutu:hover{opacity:1;border-color:var(--brand);transform:translateY(-50%) scale(1.1)}
+  .msg:hover .sec-kutu{opacity:.85}
+  .sec-kutu.dolu{background:var(--brand);border-color:var(--brand);opacity:1}
+  /* Her mesaja sol boşluk ver ki daire için yer olsun (baloncuk daireyle çakışmasın) */
+  .msg.secim-acik{margin-left:34px}
+  /* giden mesajlar zaten sağda; onlarda da daire solda durur ama sağ kenara yapışmasın */
+  .msg.out.secim-acik{margin-left:34px;margin-right:4px}
   /* Toast bildirim */
   #toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:13px 22px;border-radius:13px;font-size:13.5px;font-weight:600;box-shadow:var(--shadow-lg);z-index:300;opacity:0;transition:all .3s cubic-bezier(.2,.8,.2,1);pointer-events:none;display:flex;align-items:center;gap:9px}
   #toast.show{transform:translateX(-50%) translateY(0);opacity:1}
@@ -4385,9 +4389,11 @@ function renderMessages(c, searchQ){
     // 3=iletildi(cift tik gri), 4=okundu(cift tik mavi), -1=gonderilemedi(kirmizi).
     const tik = (cls.indexOf('out')>=0 && !m.deleted) ? tikHtml(m.durum) : '';
     // SECIM MODU: secim aciksa her mesajda bir kutu (○/✓) goster. Tiklayinca sec/birak.
+    // SEÇİM DAİRESİ: HER ZAMAN solda görünür (WhatsApp gibi). Sadece bu daireye
+    // tıklayınca seçilir/bırakılır; mesajın kendisine tıklamak seçim YAPMAZ.
     const secimModu = selectedMsgs.size>0;
-    const secKutu = secimModu ? ('<span class="sec-kutu'+(selectedMsgs.has(m.id)?' dolu':'')+'" onclick="event.stopPropagation();secimToggle(\''+esc(m.id||'')+'\')">'+(selectedMsgs.has(m.id)?'✓':'')+'</span>') : '';
-    return sep+'<div class="msg '+cls+grpCls+selCls+menCls+failCls+(secimModu?' secim-modu':'')+'" data-mid="'+esc(m.id||'')+'">'+secKutu+actions+name+fwd+quote+body+reaction+'<span class="meta">'+editedTag+esc(m.time||'')+tik+'</span></div>';
+    const secKutu = '<span class="sec-kutu'+(selectedMsgs.has(m.id)?' dolu':'')+'" onclick="event.stopPropagation();secimToggle(\''+esc(m.id||'')+'\')" title="Seç">'+(selectedMsgs.has(m.id)?'✓':'')+'</span>';
+    return sep+'<div class="msg '+cls+grpCls+selCls+menCls+failCls+' secim-acik'+(secimModu?' secim-modu':'')+'" data-mid="'+esc(m.id||'')+'">'+secKutu+actions+name+fwd+quote+body+reaction+'<span class="meta">'+editedTag+esc(m.time||'')+tik+'</span></div>';
   }).join('');
   // Render ONCESI: kullanici en altta miydi? (tazeleme sirasinda yukarida okuyorsa
   // ekrani zorla asagi atmayalim — sadece zaten en alttaysa takip et.)
@@ -4410,21 +4416,9 @@ function renderMessagesDebounced(c){
 }
 const selectedMsgs=new Set();
 document.getElementById('messages').addEventListener('click',e=>{
-  const msgEl=e.target.closest('.msg');
-  if(!msgEl)return;
-  const id=msgEl.getAttribute('data-mid');
-  if(!id)return;
-  // link/buton/medyaya tiklandiysa karisma
-  if(e.target.closest('a,button,img,video,.voice-player,.mention'))return;
-  // SECIM: SADECE zaten secim modundaysa (menudeki "Seç" ile baslatildiysa) sec/birak.
-  // Ctrl ile coklu secim KALDIRILDI (yanlislikla secim olmasin, metin kopyalamayi bozmasin).
-  if(selectedMsgs.size>0){
-    e.preventDefault();
-    if(window.getSelection) window.getSelection().removeAllRanges();
-    if(selectedMsgs.has(id)) selectedMsgs.delete(id); else selectedMsgs.add(id);
-    msgEl.classList.toggle('selected');
-    updateSelectionBar();
-  }
+  // SEÇİM artık SADECE soldaki daireye tıklayınca olur (secimToggle).
+  // Mesajın kendisine tıklamak ARTIK seçim YAPMAZ — metin seçip kopyalamayı bozmasın,
+  // yanlışlıkla seçim olmasın. (Eskiden seçim modunda mesaja tıklayınca da seçiliyordu.)
 });
 // CIFT TIKLA YANITLA: mesaj balonunun SAGINDAKI/ETRAFINDAKI BOSLUGA cift tik -> yanitla.
 // Balonun ICINE cift tik KARISMAZ -> metin secip kopyalanabilir.

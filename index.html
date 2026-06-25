@@ -74,6 +74,91 @@
   html[data-theme="dark"][data-accent="navy"]{ --ink:#1f2c33; --brand:#1a73e8; --brand-hi:#60a5fa; --brand-soft:#0f2038; --unread:#1a73e8; --out:#0a3d6b; }
   html[data-theme="dark"][data-accent="purple"]{ --ink:#1f2c33; --brand:#9061f5; --brand-hi:#a78bfa; --brand-soft:#231542; --unread:#9061f5; --out:#3a1d6b; }
   html[data-theme="dark"][data-accent="rose"]{ --ink:#1f2c33; --brand:#e11d48; --brand-hi:#f43f5e; --brand-soft:#3a1020; --unread:#e11d48; --out:#5c1226; }
+
+  /* ════════════════════════════════════════════════════════════════
+     HAZIR TEMALAR (data-skin) — en KOYUDAN en ACIGA, hafif desenli.
+     Her tema komple bir gorunum: arka plan + paneller + marka rengi + desen.
+     Ayarlar menusunden secilir. --desen: mesaj alanindaki hafif motif rengi.
+     ════════════════════════════════════════════════════════════════ */
+
+  /* 1) GECE — en koyu (siyaha yakin lacivert) */
+  html[data-skin="gece"]{
+    --ink:#0f1620; --ink-2:#1a2433; --brand:#4f8cff; --brand-hi:#6ba0ff; --brand-soft:#16223a;
+    --gold:#4f8cff; --gold-soft:#16223a;
+    --bg:#070b11; --panel:#0c121b; --panel-2:#141d29; --chat-bg:#070b11;
+    --in:#141d29; --out:#1d3a5f;
+    --text:#e6edf5; --muted:#8a97a8; --faint:#5d6b7c;
+    --border:#1a2433; --border-soft:#111a26;
+    --unread:#4f8cff; --group:#6ba0ff; --online:#3ddc84; --tick-blue:#6ba0ff;
+    --desen:rgba(255,255,255,.025);
+  }
+  /* 2) GECE YARISI MOR — koyu mor/eflatun */
+  html[data-skin="mor"]{
+    --ink:#1a1030; --ink-2:#2a1a4a; --brand:#a974ff; --brand-hi:#bd91ff; --brand-soft:#241640;
+    --gold:#a974ff; --gold-soft:#241640;
+    --bg:#0e0818; --panel:#150e26; --panel-2:#1f1638; --chat-bg:#0e0818;
+    --in:#1f1638; --out:#3a2363;
+    --text:#ece4f7; --muted:#9a8bb5; --faint:#6b5d85;
+    --border:#241a3d; --border-soft:#180f2a;
+    --unread:#a974ff; --group:#bd91ff; --online:#3ddc84; --tick-blue:#bd91ff;
+    --desen:rgba(190,150,255,.035);
+  }
+  /* 3) ORMAN — koyu yesil/zumrut */
+  html[data-skin="orman"]{
+    --ink:#0a2018; --ink-2:#0f3024; --brand:#2dd4a8; --brand-hi:#4fe0bb; --brand-soft:#0f2e24;
+    --gold:#2dd4a8; --gold-soft:#0f2e24;
+    --bg:#06120d; --panel:#0a1a14; --panel-2:#10261d; --chat-bg:#06120d;
+    --in:#10261d; --out:#13483a;
+    --text:#e0f2ea; --muted:#7da394; --faint:#527065;
+    --border:#143228; --border-soft:#0d2019;
+    --unread:#2dd4a8; --group:#4fe0bb; --online:#3ddc84; --tick-blue:#4fe0bb;
+    --desen:rgba(120,255,210,.03);
+  }
+  /* 4) OKYANUS — orta koyulukta mavi (gri-lacivert) */
+  html[data-skin="okyanus"]{
+    --ink:#13283d; --ink-2:#1c3a57; --brand:#2b9fd4; --brand-hi:#4fb6e3; --brand-soft:#15324a;
+    --gold:#2b9fd4; --gold-soft:#15324a;
+    --bg:#0d1d2b; --panel:#11263a; --panel-2:#193548; --chat-bg:#0d1d2b;
+    --in:#193548; --out:#1a4a66;
+    --text:#dceaf3; --muted:#7d97a8; --faint:#54697a;
+    --border:#1c394f; --border-soft:#122636;
+    --unread:#2b9fd4; --group:#4fb6e3; --online:#3ddc84; --tick-blue:#4fb6e3;
+    --desen:rgba(150,210,255,.03);
+  }
+  /* 5) KUM — acik bej/krem (sicak, yumusak) */
+  html[data-skin="kum"]{
+    --ink:#8a6d3a; --ink-2:#a07f43; --brand:#c79a3e; --brand-hi:#d9af52; --brand-soft:#f5ecd8;
+    --gold:#c79a3e; --gold-soft:#f5ecd8;
+    --bg:#f3ecdd; --panel:#fdf9f0; --panel-2:#f0e8d6; --chat-bg:#efe6d3;
+    --in:#fffdf7; --out:#e7dcc0;
+    --text:#3a3022; --muted:#7a6e58; --faint:#a3957b;
+    --border:#e6dcc6; --border-soft:#f0e8d6;
+    --unread:#c79a3e; --group:#b08642; --online:#3a9d6a; --tick-blue:#3b9ed4;
+    --desen:rgba(140,110,50,.04);
+  }
+  /* 6) GUL KURUSU — acik pembe/somon (pastel) */
+  html[data-skin="gul"]{
+    --ink:#b04a5e; --ink-2:#c25a6e; --brand:#e0758c; --brand-hi:#ea8ca0; --brand-soft:#fce8ec;
+    --gold:#e0758c; --gold-soft:#fce8ec;
+    --bg:#fbeef0; --panel:#fffafb; --panel-2:#fbeaed; --chat-bg:#fbeef0;
+    --in:#fffafb; --out:#fbdce2;
+    --text:#4a3338; --muted:#9a7681; --faint:#c2a3ab;
+    --border:#f5dde2; --border-soft:#fbeaed;
+    --unread:#e0758c; --group:#d4869a; --online:#3a9d6a; --tick-blue:#3b9ed4;
+    --desen:rgba(224,117,140,.04);
+  }
+  /* 7) KAR — en acik (ferah beyaz/buz mavisi) */
+  html[data-skin="kar"]{
+    --ink:#2a6da8; --ink-2:#3580bf; --brand:#3b9ed4; --brand-hi:#57b3e3; --brand-soft:#e8f4fb;
+    --gold:#3b9ed4; --gold-soft:#e8f4fb;
+    --bg:#eef4f9; --panel:#ffffff; --panel-2:#f3f8fc; --chat-bg:#eef4f9;
+    --in:#ffffff; --out:#d6ebf7;
+    --text:#1a2c3a; --muted:#5d7383; --faint:#94a8b6;
+    --border:#e2ecf4; --border-soft:#f0f5fa;
+    --unread:#3b9ed4; --group:#3b82f6; --online:#3a9d6a; --tick-blue:#3b9ed4;
+    --desen:rgba(60,140,210,.035);
+  }
+
   *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
   html,body{height:100%}
   body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;overflow:hidden;transition:background .25s}
@@ -295,7 +380,7 @@
   .ctx-item svg{width:17px;height:17px;color:var(--muted)}
 
   /* ===== Konusma alani ===== */
-  .conv{flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--chat-bg);position:relative;background-image:radial-gradient(var(--border-soft) 1px,transparent 0);background-size:22px 22px}
+  .conv{flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--chat-bg);position:relative;background-image:radial-gradient(var(--desen, var(--border-soft)) 1px,transparent 0),radial-gradient(var(--desen, var(--border-soft)) 1px,transparent 0);background-size:24px 24px,24px 24px;background-position:0 0,12px 12px}
   .conv-header{background:var(--panel);padding:13px 22px;display:flex;align-items:center;gap:15px;border-bottom:1px solid var(--border);box-shadow:var(--shadow-xs);z-index:2}
   .conv-avatar{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;background-size:cover;background-position:center;cursor:pointer;box-shadow:var(--shadow-xs);font-size:16px}
   .conv-avatar.group{border-radius:50%}
@@ -719,6 +804,14 @@
   .accent-dot{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:transform .12s;box-shadow:0 2px 5px rgba(0,0,0,.15)}
   .accent-dot:hover{transform:scale(1.08)}
   .accent-dot.active{border-color:var(--text)}
+  /* Hazir tema seçici (skin) — 4'lü ızgara, kucuk onizlemeli kartlar */
+  .skin-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;padding:2px 13px 12px}
+  .skin-card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 3px;border-radius:9px;cursor:pointer;border:2px solid transparent;transition:all .13s;background:var(--panel-2)}
+  .skin-card:hover{transform:translateY(-1px);background:var(--brand-soft)}
+  .skin-card.active{border-color:var(--brand);background:var(--brand-soft)}
+  .skin-prev{width:30px;height:30px;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.25);border:1.5px solid rgba(255,255,255,.15)}
+  .skin-ad{font-size:10.5px;font-weight:600;color:var(--text);letter-spacing:-.2px}
+  .skin-card.active .skin-ad{color:var(--brand)}
 
   .fwd-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;cursor:pointer}
   .fwd-row:hover{background:var(--panel-2)}
@@ -1159,12 +1252,32 @@
     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a9 9 0 109 9c0-.46-.04-.92-.1-1.36a5.39 5.39 0 01-4.4 2.26 5.4 5.4 0 01-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
     Karanlık tema <span class="set-toggle" id="themeToggleSwitch"></span>
   </div>
-  <div style="padding:10px 13px 6px;font-size:11.5px;color:var(--muted);font-weight:600">Renk teması</div>
-  <div class="accent-row" style="display:flex;gap:10px;padding:2px 13px 10px">
-    <span class="accent-dot" data-accent="teal" onclick="setAccent('teal')" style="background:#14b8a6" title="Teal"></span>
-    <span class="accent-dot" data-accent="navy" onclick="setAccent('navy')" style="background:#2563eb" title="Lacivert"></span>
-    <span class="accent-dot" data-accent="purple" onclick="setAccent('purple')" style="background:#7c3aed" title="Mor"></span>
-    <span class="accent-dot" data-accent="rose" onclick="setAccent('rose')" style="background:#be123c" title="Bordo"></span>
+  <div style="padding:10px 13px 6px;font-size:11.5px;color:var(--muted);font-weight:600">🎨 Tema</div>
+  <div class="skin-grid">
+    <div class="skin-card" data-skin="gece" onclick="setSkin('gece')" title="Gece (en koyu)">
+      <span class="skin-prev" style="background:linear-gradient(135deg,#070b11 50%,#4f8cff 50%)"></span><span class="skin-ad">Gece</span>
+    </div>
+    <div class="skin-card" data-skin="mor" onclick="setSkin('mor')" title="Gece Yarısı Mor">
+      <span class="skin-prev" style="background:linear-gradient(135deg,#0e0818 50%,#a974ff 50%)"></span><span class="skin-ad">Mor</span>
+    </div>
+    <div class="skin-card" data-skin="orman" onclick="setSkin('orman')" title="Orman">
+      <span class="skin-prev" style="background:linear-gradient(135deg,#06120d 50%,#2dd4a8 50%)"></span><span class="skin-ad">Orman</span>
+    </div>
+    <div class="skin-card" data-skin="okyanus" onclick="setSkin('okyanus')" title="Okyanus">
+      <span class="skin-prev" style="background:linear-gradient(135deg,#0d1d2b 50%,#2b9fd4 50%)"></span><span class="skin-ad">Okyanus</span>
+    </div>
+    <div class="skin-card" data-skin="kum" onclick="setSkin('kum')" title="Kum">
+      <span class="skin-prev" style="background:linear-gradient(135deg,#efe6d3 50%,#c79a3e 50%)"></span><span class="skin-ad">Kum</span>
+    </div>
+    <div class="skin-card" data-skin="gul" onclick="setSkin('gul')" title="Gül Kurusu">
+      <span class="skin-prev" style="background:linear-gradient(135deg,#fbeef0 50%,#e0758c 50%)"></span><span class="skin-ad">Gül</span>
+    </div>
+    <div class="skin-card" data-skin="kar" onclick="setSkin('kar')" title="Kar (en açık)">
+      <span class="skin-prev" style="background:linear-gradient(135deg,#eef4f9 50%,#3b9ed4 50%)"></span><span class="skin-ad">Kar</span>
+    </div>
+    <div class="skin-card" data-skin="klasik" onclick="setSkin('klasik')" title="Klasik WhatsApp">
+      <span class="skin-prev" style="background:linear-gradient(135deg,#efeae2 50%,#00a884 50%)"></span><span class="skin-ad">Klasik</span>
+    </div>
   </div>
   <div class="set-item" onclick="ws.send(JSON.stringify({type:'markAllRead'}));document.getElementById('settingsMenu').classList.remove('show')">
     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z"/></svg>
@@ -1597,7 +1710,12 @@ function applyTheme(t){
 }
 let theme=window.__theme||'light';
 applyTheme(theme);
-document.getElementById('themeToggle').onclick=()=>{theme=(theme==='dark')?'light':'dark';window.__theme=theme;applyTheme(theme);};
+// Ust kose karanlik/aydinlik dugmesi: hazir tema (skin) aktifse onu KLASIGE dondur
+// (yoksa skin kendi rengini dayatip dark/light dugmesi calismiyormus gibi gorunur).
+document.getElementById('themeToggle').onclick=()=>{
+  if(typeof skin!=='undefined' && skin!=='klasik') setSkin('klasik');
+  theme=(theme==='dark')?'light':'dark';window.__theme=theme;applyTheme(theme);
+};
 
 // ---- Ayarlar menusu ----
 const settingsMenu=document.getElementById('settingsMenu');
@@ -1614,6 +1732,7 @@ function toggleSound(){
   document.getElementById('soundToggle').classList.toggle('on', soundOn);
 }
 function toggleThemeFromMenu(){
+  if(typeof skin!=='undefined' && skin!=='klasik') setSkin('klasik');
   theme=(theme==='dark')?'light':'dark'; window.__theme=theme; applyTheme(theme);
 }
 // Renk temasi sec
@@ -1625,6 +1744,31 @@ function setAccent(a){
   document.querySelectorAll('.accent-dot').forEach(d=>d.classList.toggle('active', d.dataset.accent===a));
 }
 setAccent(accent);
+
+// ════════════════════════════════════════════════════════════════
+// HAZIR TEMALAR (skin): tek tikla komple gorunum degisir.
+// Secim oturum boyu (window) + tarayici hafizasi (varsa) hatirlanir.
+// 'klasik' = orijinal WhatsApp gorunumu (data-skin yok). Digerleri 7 tema.
+// ════════════════════════════════════════════════════════════════
+let skin = window.__skin || 'klasik';
+function setSkin(s){
+  skin = s; window.__skin = s;
+  if(s==='klasik'){
+    document.documentElement.removeAttribute('data-skin');
+  } else {
+    document.documentElement.setAttribute('data-skin', s);
+    // tema secilince eski accent/dark cakismasin diye onlari kaldir (tema kendi rengini getirir)
+    document.documentElement.removeAttribute('data-accent');
+    document.documentElement.removeAttribute('data-theme');
+  }
+  // secili kartı isaretle
+  document.querySelectorAll('.skin-card').forEach(c=>c.classList.toggle('active', c.dataset.skin===s));
+  // hafizaya yaz (tarayici izin veriyorsa — bazi ortamlarda kapali olabilir)
+  try{ localStorage.setItem('pekcan_skin', s); }catch(e){}
+}
+// acilista kayitli temayi geri yukle
+try{ const ks=localStorage.getItem('pekcan_skin'); if(ks) skin=ks; }catch(e){}
+setSkin(skin);
 function openSelfChat(){
   settingsMenu.classList.remove('show');
   if(!myJid){ alert('Kendi numaran henüz alınmadı, biraz bekle.'); return; }

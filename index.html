@@ -3401,6 +3401,8 @@ function _sektorelMi(kelime){
 // adi temizle -> asil isletme adi
 function grupAdiTemizle(ad){
   if(!ad) return '';
+  // ÖNCE EMOJI TEMIZLE (kullanici istegi): isimde emoji varsa cikar.
+  ad = emojiTemizle(ad);
   // ayraçlari bosluga cevir, kelimelere bol
   const parcalar = ad.replace(/[\-|/–—]+/g,' ').split(/\s+/).filter(Boolean);
   // bastan ve ortadaki gercek isim kelimelerini tut, sektorel ekleri at.

@@ -366,8 +366,7 @@
   html[data-theme="dark"] .badge{color:#06100e}
   .chat-tags{display:flex;gap:5px;margin-top:6px}
   .tag{font-size:10.5px;padding:2px 9px;border-radius:7px;font-weight:600}
-  .tag.grouptag{background:#e3edf8;color:var(--group)}
-  html[data-theme="dark"] .tag.grouptag{background:#102a40;color:#5ba3e0}
+  .tag.grouptag{background:var(--panel-2);color:var(--muted);border:1px solid var(--border-soft)}
   .chat-menu-btn{position:absolute;top:13px;right:13px;opacity:0;background:var(--panel);border:1px solid var(--border);color:var(--muted);cursor:pointer;padding:4px;border-radius:9px;transition:all .15s;box-shadow:var(--shadow-xs)}
   .chat:hover .chat-menu-btn{opacity:1}
   .chat-menu-btn:hover{color:var(--brand);border-color:var(--brand)}
@@ -772,8 +771,8 @@
   .etiket-oge-sayi{font-size:11px;font-weight:700;color:var(--muted);background:var(--panel-2);padding:1px 8px;border-radius:10px}
   .etiket-oge.aktif .etiket-oge-sayi{background:var(--brand);color:#fff}
   /* Liste etiket noktalari */
-  .liste-etiketler{display:inline-flex;gap:3px;margin-left:5px;vertical-align:middle}
-  .liste-etiket-nokta{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .liste-etiketler{display:inline-flex;gap:3px;margin-right:6px;vertical-align:middle}
+  .liste-etiket-nokta{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:0 0 0 1.5px var(--panel)}
   .modal{background:var(--panel);border-radius:8px;padding:30px;width:400px;max-width:90%;box-shadow:var(--shadow-lg);animation:modalIn .13s ease-out}
   @keyframes modalIn{from{opacity:0}to{opacity:1}}
   .modal h3{font-size:19px;font-weight:800;margin-bottom:6px;letter-spacing:-.4px}
@@ -3271,7 +3270,7 @@ function chatRow(c){
   return `<div class="chat ${c.jid===activeJid?'active':''}" onclick="openChat('${c.jid}')" oncontextmenu="openCtxMenu(event,'${c.jid}');return false;">
     ${avatarHtml(c)}
     <div class="chat-main">
-      <div class="chat-top"><span class="chat-name">${esc(c.name||c.jid)}${pinIc}${menIc}${atamaIc}${etiketNoktalari}</span>
+      <div class="chat-top"><span class="chat-name">${etiketNoktalari}${esc(c.name||c.jid)}${pinIc}${menIc}${atamaIc}</span>
         <span class="chat-time ${c.unread?'unread-time':''}">${esc(c.lastTime||'')}</span></div>
       <div class="chat-bottom"><span class="chat-preview">${esc(previewText(c))}</span>
         ${c.unread?'<span class="badge">'+c.unread+'</span>':''}</div>
@@ -5374,9 +5373,11 @@ document.addEventListener('click',(e)=>{
   const modalAcik=document.getElementById('qrMgmtModal').classList.contains('show');
   if(!modalAcik && panel.classList.contains('show') && !panel.contains(e.target) && !e.target.closest('#qrBtn')) qrClose();
 });
-// Escape: once modal, sonra panel
+// Escape: once mesaj secimi, sonra modal, sonra panel
 document.addEventListener('keydown',(e)=>{
   if(e.key!=='Escape') return;
+  // 1) Mesaj secimi aktifse (iletmek icin secim yapildiysa) ONCE onu iptal et.
+  if(typeof selectedMsgs!=='undefined' && selectedMsgs.size>0){ clearSelection(); return; }
   if(document.getElementById('qrMgmtModal').classList.contains('show')){ qrMgmtClose(); return; }
   if(document.getElementById('qrPanel').classList.contains('show')) qrClose();
 });

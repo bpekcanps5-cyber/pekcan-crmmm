@@ -581,11 +581,83 @@ app.post('/api/satislar/gunu-kapat', express.json(), async (req, res) => {
   }
 });
 
+// ============================================================
+// PERFORMANS RAPORU API (SADECE YÖNETİCİ)
+// Kişi kişi: kaç poliçe (PDF) yüklemiş + branş dağılımı + kaç kesim/ilgilenme mesajı.
+// kapsam: bugun | hafta | ay | tum | ozel
+// ============================================================
+app.post('/api/performans', express.json(), async (req, res) => {
+  if (!isAdmin(req.body?.token)) return res.json({ ok: false, error: 'Bu rapora sadece yönetici erişebilir' });
+  // tarih aralığı
+  let ar;
+  const kapsam = req.body?.kapsam || 'bugun';
+  const now = new Date();
+  if (kapsam === 'bugun') {
+    ar = { bas: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime(),
+           bit: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime() };
+  } else if (kapsam === 'hafta') {
+    ar = { bas: Date.now() - 7 * 24 * 60 * 60 * 1000, bit: Date.now() };
+  } else if (kapsam === 'ay') {
+    ar = { bas: new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0).getTime(), bit: Date.now() };
+  } else if (kapsam === 'ozel' && req.body?.bas && req.body?.bit) {
+    ar = { bas: new Date(req.body.bas + 'T00:00:00').getTime(), bit: new Date(req.body.bit + 'T23:59:59.999').getTime() };
+  } else {
+    ar = null; // tüm
+  }
+  try {
+    const hat = req.body?.lineId || null; // opsiyonel hat filtresi (yoksa tüm hatlar)
+    const policeler = await db.loadPoliceYuklemeler(ar?.bas ?? null, ar?.bit ?? null, hat);
+    const aktiviteler = await db.loadAktiviteler(ar?.bas ?? null, ar?.bit ?? null, hat);
+
+    // KİŞİ BAZINDA TOPLA: kullanıcı adına göre grupla
+    const kisiler = {}; // ad -> { ad, police, branslar:{}, kesim, ilgilenme, iki_aylik, gruplar:Set }
+    function kisiAl(ad) {
+      const k = (ad || 'Bilinmeyen').trim() || 'Bilinmeyen';
+      if (!kisiler[k]) kisiler[k] = { ad: k, police: 0, branslar: {}, kesim: 0, ilgilenme: 0, ikiAylik: 0, gruplar: new Set() };
+      return kisiler[k];
+    }
+    for (const p of policeler) {
+      const k = kisiAl(p.kullanici_ad);
+      k.police++;
+      const b = p.brans || 'diğer';
+      k.branslar[b] = (k.branslar[b] || 0) + 1;
+      if (p.iki_aylik) k.ikiAylik++;
+      if (p.chat_jid) k.gruplar.add(p.chat_jid);
+    }
+    for (const a of aktiviteler) {
+      const k = kisiAl(a.kullanici_ad);
+      if (a.tur === 'kesim') k.kesim++;
+      else if (a.tur === 'ilgileniyorum') k.ilgilenme++;
+    }
+    // diziye çevir + grup sayısını sayıya çevir + poliçeye göre sırala (en çok üstte)
+    const liste = Object.values(kisiler).map(k => ({
+      ad: k.ad, police: k.police, branslar: k.branslar,
+      kesim: k.kesim, ilgilenme: k.ilgilenme, ikiAylik: k.ikiAylik,
+      grupSayisi: k.gruplar.size,
+    })).sort((a, b) => b.police - a.police || b.kesim - a.kesim);
+
+    // GENEL TOPLAMLAR (üstteki özet kartları için)
+    const toplam = {
+      police: policeler.length,
+      kisi: liste.length,
+      kesim: aktiviteler.filter(a => a.tur === 'kesim').length,
+      ilgilenme: aktiviteler.filter(a => a.tur === 'ilgileniyorum').length,
+      ikiAylik: policeler.filter(p => p.iki_aylik).length,
+    };
+    // branş dağılımı (genel)
+    const bransDagilim = {};
+    for (const p of policeler) { const b = p.brans || 'diğer'; bransDagilim[b] = (bransDagilim[b] || 0) + 1; }
+
+    res.json({ ok: true, kapsam, liste, toplam, bransDagilim });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 // Rol degistir - yonetici yap/geri al (sadece yonetici)
 app.post('/api/users/role', express.json(), async (req, res) => {
   if (!isAdmin(req.body?.token)) return res.json({ ok: false, error: 'Yetki yok' });
   const yeniRol = req.body?.role === 'admin' ? 'admin' : 'agent';
-  const r = await db.setUserRole(req.body?.id, yeniRol);
   // bu kullanicinin acik oturumlarinin rolunu de guncelle (bellek + DB)
   // (id -> username: kullanici listesinden bul)
   try {
@@ -781,6 +853,40 @@ app.post('/upload', express.raw({ type: '*/*', limit: '64mb' }), async (req, res
       mediaUrl: webPath, sender: agent, time: nowTime(),
       durum: 2, // gonderildi (tek tik)
     }, {}, upLineId);
+
+    // ---- PERFORMANS RAPORU: yüklenen PDF poliçe mi? Öyleyse kaydet. ----
+    // SADECE panelden SÜRÜKLENİP yüklenen PDF'ler (bu rota = gerçek yükleme, iletme DEĞİL).
+    // "POS" geçenler policeAdiAyristir içinde elenir (null döner).
+    if (kind === 'document') {
+      try {
+        const ayristir = policeAdiAyristir(fileName);
+        if (ayristir && db.isReady()) {
+          const C3 = hatChats(upLineId);
+          const chat3 = C3 && C3.get ? C3.get(jid) : null;
+          const polId = 'pol_' + upLineId + '_' + (sent.key.id || (Date.now() + '_' + Math.random().toString(36).slice(2, 8)));
+          db.savePoliceYukleme({
+            id: polId,
+            lineId: upLineId,
+            kullanici: (s && s.username) ? s.username : '',
+            kullaniciAd: agent || (s && s.displayName) || 'Bilinmeyen',
+            chatJid: jid,
+            chatName: chat3?.name || (jid || '').split('@')[0],
+            dosyaAdi: fileName,
+            brans: ayristir.brans,
+            plaka: ayristir.plaka,
+            ikiAylik: ayristir.ikiAylik,
+            ts: Date.now(),
+          }).then((r) => {
+            if (r.ok && r.yeni) {
+              console.log(`📄 POLİÇE yüklendi [${upLineId}]: ${ayristir.brans}${ayristir.plaka ? ' ' + ayristir.plaka : ''} | ${agent} | ${(chat3?.name || '').slice(0, 25)}`);
+              // canlı haber ver (rapor açıksa güncellensin)
+              broadcastHat(upLineId, { type: 'yeniPolice', kullanici: agent });
+            }
+          }).catch(() => {});
+        }
+      } catch (e) { /* poliçe kaydı başarısız olsa bile yükleme tamamlandı */ }
+    }
+
     res.json({ ok: true });
   } catch (e) {
     console.error('Yukleme hatasi:', e.message);
@@ -2066,6 +2172,98 @@ function satisAyristir(text) {
   const adet = m[2] ? parseInt(m[2], 10) : 1;
   if (adet < 1 || adet > 9999) return null; // mantiksiz adet
   return { urun, adet };
+}
+
+// ============================================================
+// POLİÇE DOSYA ADI AYRIŞTIRMA (performans raporu için)
+// Yüklenen PDF'in adından branş + plaka çıkarır. "POS" geçiyorsa REDDEDER.
+// Örnek ad: "CEMSAT ... TRAFİK SİGORTASI 34 EK 8531 (GRUP ADI) 06 HAZİRAN 2026.pdf"
+// Dönüş: null (poliçe değil/POS) | { brans, plaka, ikiAylik }
+// ============================================================
+// Dosya adında brans tespiti icin anahtar kelimeler -> normalize brans.
+// ÖNCE tam/uzun kelimeler aranır; bulunmazsa KISALTMALAR (tek başına duran) denenir.
+// ÖNEMLİ: Branş bulunamazsa bile PDF yine SAYILIR ('diğer' branş) — hiçbir poliçe kaçmaz.
+const POLICE_BRANS_TAM = {
+  'trafik': 'trafik', 'kasko': 'kasko', 'dask': 'dask',
+  'yeşilkart': 'yeşilkart', 'yesilkart': 'yeşilkart', 'yeşil kart': 'yeşilkart',
+  'konut': 'konut', 'işyeri': 'işyeri', 'isyeri': 'işyeri', 'iş yeri': 'işyeri',
+  'tamamlayıcı sağlık': 'tss', 'tamamlayici saglik': 'tss',
+  'ferdi kaza': 'ferdi kaza', 'sağlık': 'sağlık', 'saglik': 'sağlık',
+  'nakliyat': 'nakliyat', 'seyahat': 'seyahat',
+};
+// KISALTMALAR: sadece TEK BAŞINA (kelime sınırlı) eşleşir — tesadüfi eşleşmeyi önler.
+// Örn. "TR", "TRF", "TRFK" -> trafik; "KSK" -> kasko; "İMM"/"IMM" -> imm.
+const POLICE_BRANS_KISA = {
+  'trafik': 'trafik', 'trf': 'trafik', 'trfk': 'trafik', 'tr': 'trafik',
+  'kasko': 'kasko', 'ksk': 'kasko', 'ks': 'kasko',
+  'dask': 'dask', 'dsk': 'dask',
+  'tss': 'tss', 'tmss': 'tss',
+  'yeşilkart': 'yeşilkart', 'yesilkart': 'yeşilkart', 'yk': 'yeşilkart',
+  'konut': 'konut', 'knt': 'konut',
+  'işyeri': 'işyeri', 'isyeri': 'işyeri',
+  'öss': 'öss', 'oss': 'öss',
+  'imm': 'imm', 'ımm': 'imm',
+  'fk': 'ferdi kaza',
+};
+function policeAdiAyristir(dosyaAdi) {
+  if (!dosyaAdi || typeof dosyaAdi !== 'string') return null;
+  // Türkçe-güvenli küçültme: "İ"->"i", "I"->"i" düzgün olsun (yoksa TRAFİK eşleşmez)
+  const trKucult = (s) => s
+    .replace(/İ/g, 'i').replace(/I/g, 'i').replace(/Ş/g, 'ş').replace(/Ğ/g, 'ğ')
+    .replace(/Ü/g, 'ü').replace(/Ö/g, 'ö').replace(/Ç/g, 'ç')
+    .toLowerCase();
+  const adLower = trKucult(dosyaAdi);
+  // sadece PDF'leri poliçe say
+  if (!adLower.endsWith('.pdf')) return null;
+  // "POS" geçiyorsa REDDET (kelime sınırıyla — içinde geçenleri yanlış elemesin)
+  if (/\bpos\b/i.test(dosyaAdi) || /[ _-]pos[ _.-]/i.test(dosyaAdi)) return null;
+  // BRANŞ TESPİTİ — 2 aşamalı:
+  let brans = '';
+  // 1) ÖNCE tam kelimeler (en güvenilir). İlk eşleşen kazanır.
+  for (const [kelime, normal] of Object.entries(POLICE_BRANS_TAM)) {
+    if (adLower.includes(trKucult(kelime))) { brans = normal; break; }
+  }
+  // 2) Tam kelime yoksa KISALTMALARı dene — ama SADECE tek başına duranı (kelime sınırlı).
+  //    Böylece "TR" tesadüfen başka kelimenin içinde geçerse yakalanmaz.
+  if (!brans) {
+    for (const [kisa, normal] of Object.entries(POLICE_BRANS_KISA)) {
+      // kelime sınırı: rakam/harf olmayan (veya satır başı/sonu) ile çevrili
+      const re = new RegExp('(^|[^a-z0-9çğıöşü])' + kisa.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z0-9çğıöşü]|$)');
+      if (re.test(adLower)) { brans = normal; break; }
+    }
+  }
+  // PLAKA: Türk plaka formatı (34 EK 8531 / 34EK8531 / 06 ABC 123 gibi)
+  let plaka = '';
+  const plakaM = dosyaAdi.match(/\b(0?[1-9]|[1-7][0-9]|8[01])\s?[A-ZÇĞİÖŞÜa-zçğıöşü]{1,3}\s?\d{2,4}\b/);
+  if (plakaM) plaka = plakaM[0].toUpperCase().replace(/\s+/g, ' ').trim();
+  // 2 AYLIK: dosya adında açıkça "2 aylık / 2ay / 2a" yazıyorsa işaretle (opsiyonel ipucu)
+  const ikiAylik = /2\s?ayl[ıi]k|2\s?ay\b|\b2a\b|\b2ay\b/i.test(dosyaAdi);
+  // PDF her durumda poliçe SAYILIR; branş bulunamazsa 'diğer' (hiçbir PDF kaçmaz).
+  return { brans: brans || 'diğer', plaka, ikiAylik };
+}
+
+// ============================================================
+// AKTİVİTE MESAJI TESPİTİ (kesim/ilgilenme — yanlış yazım dahil)
+// "ilgileniyorum, bakıyorum, kesiyorum, kesildi" vb. + bunların hatalı yazımları.
+// Dönüş: null (alakasız) | { tur } ('kesim' | 'ilgileniyorum')
+// ============================================================
+function aktiviteMesajiTespit(text) {
+  if (!text || typeof text !== 'string') return null;
+  // küçült + Türkçe karakterleri sadeleştir (yanlış yazımı yakalamak için)
+  let t = text.toLowerCase()
+    .replace(/ı/g, 'i').replace(/İ/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c');
+  t = t.trim();
+  if (t.length > 60) return null; // uzun mesajlar genelde kesim bildirimi değil
+  // SORU cümlelerini ELE: "kesilecek mi?", "kesti mi" gibi sorular iş bildirimi değil.
+  if (/\bm[iı]\?*\s*$/.test(t) || t.includes('?')) return null;
+  // KESİM grubu: yapılan/yapılıyor eylem (kesiyorum, kesildi, kesti, kesicem, kesiyom).
+  // "kesilecek" (gelecek/soru) hariç — sadece olmuş/oluyor halleri.
+  if (/\bkesti\b|\bkesildi\b|\bkesiyor|\bkesiyom|\bkesicem|\bkesicez|\bkestim\b|\bkesildi/.test(t)) return { tur: 'kesim' };
+  // İLGİLENME grubu: ilgilen-, bak- (ilgileniyorum, bakıyorum, bakıorum, bakiyom)
+  if (/\bilgileniyor|\bilgilenıyor|\bilgilendim\b|\bilgilenicem/.test(t)) return { tur: 'ilgileniyorum' };
+  if (/\bbakiyor|\bbakior|\bbakiyom|\bbakicam|\bbaktim\b/.test(t)) return { tur: 'ilgileniyorum' };
+  return null;
 }
 
 // Bir satis komutunu DB'ye kaydet (hat-izole). Panele de canli haber verir.
@@ -3848,6 +4046,28 @@ async function startWA(lineId = 'ofis') {
           const saticiJid2 = fromMe ? (myNum ? myNum + '@s.whatsapp.net' : '') : (senderJid || '');
           const chatObj = CC.get(jid);
           satisKaydet(m, satis, lineId, chatObj, saticiAdi, saticiJid2).catch(() => {});
+        }
+        // --- AKTİVİTE MESAJI: "ilgileniyorum/kesiyorum" vb. (yanlış yazım dahil) ---
+        // SADECE ofis ekibi/kayıtlı kişiler sayılır (müşteri yazınca sayma).
+        // fromMe (panelden/hat) VEYA senderOfis (kayıtlı ofis kişisi) ise geçerli.
+        if (fromMe || senderOfis) {
+          const akt = aktiviteMesajiTespit(info.text);
+          if (akt && db.isReady()) {
+            const chatObj2 = CC.get(jid);
+            const aktKisiAdi = fromMe ? (line?.myName || 'Ben') : (senderName || senderPush || '');
+            const aktId = 'akt_' + lineId + '_' + (m.key?.id || (Date.now() + '_' + Math.random().toString(36).slice(2, 8)));
+            db.saveAktivite({
+              id: aktId,
+              lineId,
+              kullanici: '', // grup mesajında panel kullanıcı adı yok; ad ile takip edilir
+              kullaniciAd: aktKisiAdi,
+              chatJid: jid,
+              chatName: chatObj2?.name || (jid || '').split('@')[0],
+              tur: akt.tur,
+              hamMesaj: (info.text || '').slice(0, 80),
+              ts: m.messageTimestamp ? Number(m.messageTimestamp) * 1000 : Date.now(),
+            }).catch(() => {});
+          }
         }
       }
 

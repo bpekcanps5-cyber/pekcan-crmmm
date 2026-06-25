@@ -860,6 +860,89 @@ async function loadChatLabels() {
   } catch (e) { return {}; }
 }
 
+// ============================================================
+// POLİÇE YÜKLEMELERİ (police_yuklemeler) — PERFORMANS RAPORU İÇİN
+// Panelden SÜRÜKLENİP yüklenen her PDF (poliçe) burada loglanır.
+// İletilen (forward) dosyalar BURAYA YAZILMAZ — sadece gerçek yüklemeler.
+// "POS" içeren dosyalar da yazılmaz (server.js'te filtrelenir).
+// Kim, ne zaman, hangi gruba, hangi branş — yönetici performans raporu için.
+// ============================================================
+async function savePoliceYukleme(p) {
+  if (!aktif) return { ok: false };
+  try {
+    const r = await pool.query(
+      `INSERT INTO police_yuklemeler (id, line_id, kullanici, kullanici_ad, chat_jid, chat_name, dosya_adi, brans, plaka, iki_aylik, ts, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
+       ON CONFLICT (id) DO NOTHING
+       RETURNING *`,
+      [p.id, p.lineId || 'ofis', p.kullanici || '', p.kullaniciAd || '', p.chatJid || '', p.chatName || '',
+       p.dosyaAdi || '', p.brans || '', p.plaka || '', !!p.ikiAylik, p.ts || Date.now()]
+    );
+    return { ok: true, yeni: r.rows.length > 0, row: r.rows[0] || null };
+  } catch (e) {
+    // tablo henuz yoksa sessizce gec (SQL calistirilmamis olabilir) — yukleme yine de calisir
+    if (!(e.message || '').includes('police_yuklemeler')) console.error('savePoliceYukleme hatasi:', e.message);
+    return { ok: false, error: e.message };
+  }
+}
+
+// Belirli tarih aralığındaki TÜM poliçe yüklemelerini getir (yönetici raporu).
+// kullaniciFiltre verilirse sadece o kişininkiler.
+async function loadPoliceYuklemeler(baslangicTs = null, bitisTs = null, lineId = null) {
+  if (!aktif) return [];
+  try {
+    let sql = 'SELECT * FROM police_yuklemeler WHERE 1=1';
+    const params = [];
+    if (baslangicTs !== null && bitisTs !== null) {
+      params.push(baslangicTs, bitisTs);
+      sql += ` AND ts >= $${params.length - 1} AND ts <= $${params.length}`;
+    }
+    if (lineId) { params.push(lineId); sql += ` AND line_id = $${params.length}`; }
+    sql += ' ORDER BY ts DESC LIMIT 5000';
+    const r = await pool.query(sql, params);
+    return r.rows;
+  } catch (e) { return []; }
+}
+
+// ============================================================
+// AKTİVİTE MESAJLARI (aktivite_mesajlar) — "ilgileniyorum/kesiyorum" sayımı
+// Gruplarda kesim/ilgilenme mesajı yazan kişiyi loglar (yanlış yazım dahil).
+// Performans raporunda "kaç kesim mesajı" olarak gösterilir. Ayrı/yan veridir.
+// ============================================================
+async function saveAktivite(a) {
+  if (!aktif) return { ok: false };
+  try {
+    const r = await pool.query(
+      `INSERT INTO aktivite_mesajlar (id, line_id, kullanici, kullanici_ad, chat_jid, chat_name, tur, ham_mesaj, ts, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
+       ON CONFLICT (id) DO NOTHING
+       RETURNING *`,
+      [a.id, a.lineId || 'ofis', a.kullanici || '', a.kullaniciAd || '', a.chatJid || '', a.chatName || '',
+       a.tur || 'kesim', a.hamMesaj || '', a.ts || Date.now()]
+    );
+    return { ok: true, yeni: r.rows.length > 0 };
+  } catch (e) {
+    if (!(e.message || '').includes('aktivite_mesajlar')) console.error('saveAktivite hatasi:', e.message);
+    return { ok: false, error: e.message };
+  }
+}
+
+async function loadAktiviteler(baslangicTs = null, bitisTs = null, lineId = null) {
+  if (!aktif) return [];
+  try {
+    let sql = 'SELECT * FROM aktivite_mesajlar WHERE 1=1';
+    const params = [];
+    if (baslangicTs !== null && bitisTs !== null) {
+      params.push(baslangicTs, bitisTs);
+      sql += ` AND ts >= $${params.length - 1} AND ts <= $${params.length}`;
+    }
+    if (lineId) { params.push(lineId); sql += ` AND line_id = $${params.length}`; }
+    sql += ' ORDER BY ts DESC LIMIT 5000';
+    const r = await pool.query(sql, params);
+    return r.rows;
+  } catch (e) { return []; }
+}
+
 // Periyodik temizligi baslat: acilista bir kez + her 24 saatte bir calisir.
 let _cleanupTimer = null;
 function startCleanup() {
@@ -885,4 +968,5 @@ module.exports = {
   addAllowedIp, removeAllowedIp, loadAllowedIps,
   setUserLine, getUserLine, loadUserLines, saveLine, loadLines, deleteLineData,
   saveSatis, loadSatislar, loadTumSatislar, updateSatisAdet, setSatisOnay, deleteSatis, gunuKapat, loadKapaliGunler,
+  savePoliceYukleme, loadPoliceYuklemeler, saveAktivite, loadAktiviteler,
 };

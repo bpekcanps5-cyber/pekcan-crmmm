@@ -236,14 +236,20 @@ async function loadAll(lineId = 'ofis') {
 const SAKLAMA_GUN = 30;
 function eskiEsikMs() { return Date.now() - SAKLAMA_GUN * 24 * 60 * 60 * 1000; }
 
-async function loadMessages(chatJid, limit = 60, lineId = 'ofis') {
+async function loadMessages(chatJid, limit = 60, lineId = 'ofis', beforeTs = null) {
   if (!aktif) return [];
   try {
-    // Sadece son SAKLAMA_GUN gunluk + bu hatta ait mesajlari getir (izolasyon).
-    const r = await pool.query(
-      'SELECT * FROM messages WHERE line_id=$1 AND chat_jid=$2 AND ts >= $3 ORDER BY ts DESC LIMIT $4',
-      [lineId, chatJid, eskiEsikMs(), limit]
-    );
+    // Sadece son SAKLAMA_GUN gunluk + bu hatta ait mesajlar (izolasyon).
+    // beforeTs verilirse: o zamandan ESKI mesajlari getir (sonsuz scroll / "daha fazla yukle").
+    let sql, params;
+    if (beforeTs) {
+      sql = 'SELECT * FROM messages WHERE line_id=$1 AND chat_jid=$2 AND ts >= $3 AND ts < $4 ORDER BY ts DESC LIMIT $5';
+      params = [lineId, chatJid, eskiEsikMs(), beforeTs, limit];
+    } else {
+      sql = 'SELECT * FROM messages WHERE line_id=$1 AND chat_jid=$2 AND ts >= $3 ORDER BY ts DESC LIMIT $4';
+      params = [lineId, chatJid, eskiEsikMs(), limit];
+    }
+    const r = await pool.query(sql, params);
     return r.rows.reverse(); // eskiden yeniye
   } catch (e) {
     console.error('⚠️  DB loadMessages hatasi:', e.message);

@@ -1965,12 +1965,12 @@ wss.on('connection', (ws) => {
           }
           // 1) ANINDA: bellekte ne varsa hemen gonder — kullanici beklemesin (yavaslik/bos acilis biter).
           if (chat.messages && chat.messages.length) {
-            ws.send(JSON.stringify({ type: 'message', jid: msg.jid, chat: stripRaw(chat) }));
+            ws.send(JSON.stringify({ type: 'message', jid: msg.jid, chat: stripRaw(chat, 300) }));
           }
           // 2) ARKA PLANDA: DB'den son mesajlari cek, EKSIK olanlari ekle, sonra tekrar gonder.
           //    Boylece acilis hizli olur, eksik mesaj varsa hemen ardindan tamamlanir.
           if (db.isReady()) {
-            db.loadMessages(msg.jid, 80, _LID).then((rows) => {
+            db.loadMessages(msg.jid, 300, _LID).then((rows) => {
               console.log(`📨 loadMessages [${(chat.name||msg.jid).slice(0,30)}]: bellekte ${chat.messages?.length||0}, DB'den ${rows.length} mesaj`);
               const dbMsgs = rows.map(r => ({
                 id: r.id, fromMe: r.from_me, kind: r.kind, text: r.text || '',
@@ -1993,7 +1993,7 @@ wss.on('connection', (ws) => {
                 chat.messages = Array.from(birlesik.values()).sort((a, b) => (a.ts || 0) - (b.ts || 0));
                 const last = chat.messages[chat.messages.length - 1];
                 if (last) { chat.lastTs = last.ts || chat.lastTs; chat.lastTime = last.time || chat.lastTime; }
-                ws.send(JSON.stringify({ type: 'message', jid: msg.jid, chat: stripRaw(chat) }));
+                ws.send(JSON.stringify({ type: 'message', jid: msg.jid, chat: stripRaw(chat, 300) }));
               }
             }).catch(() => {});
           } else if (!chat.messages.length) {
@@ -2043,6 +2043,41 @@ wss.on('connection', (ws) => {
               ws.send(JSON.stringify({ type: 'message', jid: msg.jid, chat: stripRaw(chat) }));
             }
           }
+        }
+      }
+
+      // SONSUZ SCROLL: panel en yukari kayinca "daha eski mesaj getir" der.
+      // beforeTs'ten ESKI mesajlari DB'den cekip panele AYRI gonderir (ustetune eklenir).
+      else if (msg.type === 'loadOlder') {
+        const chat = C.get(msg.jid);
+        if (chat && db.isReady() && msg.beforeTs) {
+          const rows = await db.loadMessages(msg.jid, 200, _LID, Number(msg.beforeTs));
+          const eskiMsgs = rows.map(r => ({
+            id: r.id, fromMe: r.from_me, kind: r.kind, text: r.text || '',
+            mediaUrl: r.media_url || null, thumb: r.thumb || null,
+            sender: r.sender || '', senderJid: r.sender_jid || '', senderPush: r.sender_push || '',
+            replyTo: r.reply_to || null, contact: r.contact_data || null, contacts: r.contacts_data || null,
+            reaction: r.reaction || null, myReaction: r.my_reaction || null,
+            forwarded: r.forwarded || false, mentionsMe: r.mentions_me || false,
+            edited: r.edited || false, deleted: r.deleted || false,
+            time: r.time || '', ts: Number(r.ts) || 0, key: r.key_data || null,
+            mentions: r.mentions || null, caption: r.caption || '',
+          }));
+          // belleğe de ekle (varsa tekrar etme) ki bir daha sorulmasın
+          if (eskiMsgs.length) {
+            const mevcut = new Set((chat.messages || []).map(x => x.id));
+            const yeniler = eskiMsgs.filter(x => !mevcut.has(x.id));
+            if (yeniler.length) {
+              chat.messages = [...yeniler, ...(chat.messages || [])].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+              // bellek limitini koru (en yeni 400) — ama eski yükleme yaptıysak geçici taşmaya izin ver
+              if (chat.messages.length > 600) chat.messages = chat.messages.slice(-600);
+            }
+          }
+          console.log(`⬆️  loadOlder [${(chat.name||msg.jid).slice(0,25)}]: ${eskiMsgs.length} eski mesaj gönderildi`);
+          // AYRI tip: panel bunları üste ekleyecek, mevcut görünümü bozmayacak
+          ws.send(JSON.stringify({ type: 'olderMessages', jid: msg.jid, messages: eskiMsgs, bitti: eskiMsgs.length < 200 }));
+        } else {
+          ws.send(JSON.stringify({ type: 'olderMessages', jid: msg.jid, messages: [], bitti: true }));
         }
       }
 
@@ -2745,11 +2780,11 @@ function addMessage(jid, message, meta = {}, lineId = 'ofis') {
   if (meta.memberCount) chat.memberCount = meta.memberCount;
   if (meta.members) chat.members = meta.members;
   chat.messages.push(message);
-  // BELLEK OPTIMIZASYONU (40 kullanici): her sohbette bellekte en fazla 200 mesaj tut.
+  // BELLEK OPTIMIZASYONU (40 kullanici): her sohbette bellekte en fazla 400 mesaj tut.
   // Daha eskiler bellekten dusurulur (DB'de KALIR — sohbet acilinca oradan yuklenir).
-  // Boylece sunucu hafizasi 7500 sohbet x sinirsiz mesaj ile sismez.
-  if (chat.messages.length > 200) {
-    chat.messages = chat.messages.slice(-200);
+  // 400 mesaj = yogun bir grupta bile rahat 2 hafta gerisini kapsar.
+  if (chat.messages.length > 400) {
+    chat.messages = chat.messages.slice(-400);
   }
   chat.lastTime = message.time;
   chat.lastTs = now;
@@ -2767,10 +2802,9 @@ function addMessage(jid, message, meta = {}, lineId = 'ofis') {
 }
 
 // raw + key (buyuk/hassas alanlar) panele gonderilmez — sadece sunucuda tutulur
-// Ayrica panele en fazla son 120 mesaj gonderilir (performans: 500 mesaji her seferinde yollamak kasiyor)
-function stripRaw(chat) {
-  // 40 kullanici icin trafik optimizasyonu: her sohbet guncellemesinde son 60 mesaj gonderilir
-  const recent = chat.messages.length > 60 ? chat.messages.slice(-60) : chat.messages;
+// limit: normal mesaj akisinda 60 (trafik az), sohbet ACILISINDA 300 (eski mesajlar gorunur).
+function stripRaw(chat, limit = 60) {
+  const recent = chat.messages.length > limit ? chat.messages.slice(-limit) : chat.messages;
   return {
     ...chat,
     // ACIKLAMA her zaman TANIMLI gitsin: undefined ise panel "eskisini koru" deyip

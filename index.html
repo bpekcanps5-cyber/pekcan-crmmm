@@ -522,6 +522,8 @@
   .ofis-rozet{font-size:11px;opacity:.9;flex-shrink:0}
   /* ofis uyesinin adi: hafif arka plan + cizgi ile one cikar */
   .msg .sender-name.ofis-uye{padding:1px 7px;border-radius:6px;background:rgba(34,197,94,.13);border-left:3px solid var(--brand)}
+  /* GIDEN ekip mesaji adi: panel kullanicisi belli olsun (hafif vurgu) */
+  .msg .sender-name.team-name{padding:1px 7px;border-radius:6px;background:rgba(34,197,94,.13);border-left:3px solid var(--brand);display:inline-flex;align-items:center;gap:4px;width:fit-content}
   /* *kalin* metin: renkli ve kalin (WhatsApp tarzi vurgu) */
   /* *kalin* metin: renkli, canli, kalin (animasyonsuz, sabit) */
   .md-bold{
@@ -882,6 +884,8 @@
   .selection-bar button:hover{background:rgba(255,255,255,.22)}
   .selection-bar button.primary{background:var(--brand)}
   .selection-bar button.primary:hover{background:var(--brand-hi)}
+  .selection-bar button.sil-btn{background:rgba(239,68,68,.85)}
+  .selection-bar button.sil-btn:hover{background:rgba(239,68,68,1)}
   .selection-bar button svg{width:17px;height:17px}
   .qr-screen{position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,var(--ink) 0%,#0a3d35 100%);display:none;align-items:center;justify-content:center;padding:20px}
   .qr-screen.show{display:flex}
@@ -1114,6 +1118,7 @@
       <div class="selection-bar" id="selectionBar">
         <button onclick="clearSelection()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
         <span class="sel-count" id="selCount">0 seçildi</span>
+        <button onclick="silSelected()" class="sil-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sil</button>
         <button class="primary" onclick="forwardSelected()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11z"/></svg>İlet</button>
       </div>
       <div class="messages" id="messages"></div>
@@ -2015,14 +2020,33 @@ function connect(){
         }
       }
     }
-    else if(d.type==='opError'){ showToast(d.error||'İşlem başarısız'); }
+    else if(d.type==='opError'){
+      // Toplu silme sırasındaysak: hata olsa bile sıradakine geç (zincir takılmasın).
+      if(typeof _topluSilToplam!=='undefined' && _topluSilToplam>1 && (_topluSilSira.length || _topluSilJid)){
+        gonderSiradakiSil();
+      } else {
+        showToast(d.error||'İşlem başarısız');
+      }
+    }
     else if(d.type==='sendError'){
       // MESAJ GITMEDI: net uyari goster + yazilan metni geri koy (kaybolmasin).
       showToast('⚠️ '+(d.error||'Mesaj gönderilemedi!'));
       const inp=document.getElementById('msgInput');
       if(inp && d.text && !inp.value.trim()){ inp.value=d.text; autoGrow(inp); }
     }
-    else if(d.type==='opOk'){ showToast(d.message||'Tamamlandı'); }
+    else if(d.type==='opOk'){
+      // Toplu silme sırasındaysak: tek tek "silindi" toast'ı GÖSTERME (kalabalık olur),
+      // sadece sıradaki mesajı sil. İlerleme/bitiş toast'ını gonderSiradakiSil basar.
+      if(typeof _topluSilToplam!=='undefined' && _topluSilToplam>1 && (_topluSilSira.length || _topluSilJid)){
+        if(_topluSilSira.length){
+          const kalan=_topluSilToplam-_topluSilSira.length+1;
+          showToast('Siliniyor… ('+kalan+'/'+_topluSilToplam+')');
+        }
+        gonderSiradakiSil();
+      } else {
+        showToast(d.message||'Tamamlandı');
+      }
+    }
     else if(d.type==='typing'){ handleTyping(d); }
     else if(d.type==='openChat'){ setTimeout(()=>{ if(chats[d.jid]) openChat(d.jid); }, 250); }
     else if(d.type==='forwardResult'){
@@ -2560,24 +2584,26 @@ async function satisOnayla(id, onayli){
     if(d.ok){ kontrolYukle(); } else showToast('⚠️ '+(d.error||'İşlem başarısız'));
   }catch(e){ showToast('⚠️ Bağlantı hatası'); }
 }
-async function satisSil(id){
-  if(!confirm('Bu satış kaydını silmek istediğine emin misin?')) return;
-  try{
-    const r=await fetch('/api/satislar/sil',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:authToken, id})});
-    const d=await r.json();
-    if(d.ok){ showToast('Satış silindi'); kontrolYukle(); } else showToast('⚠️ '+(d.error||'Silinemedi'));
-  }catch(e){ showToast('⚠️ Bağlantı hatası'); }
+function satisSil(id){
+  askConfirm('Satışı sil', 'Bu satış kaydını silmek istediğine emin misin?', 'Sil', async ()=>{
+    try{
+      const r=await fetch('/api/satislar/sil',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:authToken, id})});
+      const d=await r.json();
+      if(d.ok){ showToast('Satış silindi'); kontrolYukle(); } else showToast('⚠️ '+(d.error||'Silinemedi'));
+    }catch(e){ showToast('⚠️ Bağlantı hatası'); }
+  });
 }
-async function gunuKapat(){
+function gunuKapat(){
   const bugun=new Date().toLocaleDateString('tr-TR');
-  if(!confirm('Bugünün ('+bugun+') tüm satışları kilitlenecek ve onaylanmış sayılacak. Kapatılan gün düzenlenemez. Devam edilsin mi?')) return;
-  try{
-    const tarih=new Date().toISOString().slice(0,10);
-    const r=await fetch('/api/satislar/gunu-kapat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:authToken, tarih})});
-    const d=await r.json();
-    if(d.ok){ showToast('🔒 Gün kapatıldı · toplam '+d.toplam+' adet'); kontrolYukle(); }
-    else showToast('⚠️ '+(d.error||'Kapatılamadı'));
-  }catch(e){ showToast('⚠️ Bağlantı hatası'); }
+  askConfirm('Günü kapat', 'Bugünün ('+bugun+') tüm satışları kilitlenecek ve onaylanmış sayılacak. Kapatılan gün düzenlenemez. Devam edilsin mi?', 'Günü Kapat', async ()=>{
+    try{
+      const tarih=new Date().toISOString().slice(0,10);
+      const r=await fetch('/api/satislar/gunu-kapat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:authToken, tarih})});
+      const d=await r.json();
+      if(d.ok){ showToast('🔒 Gün kapatıldı · toplam '+d.toplam+' adet'); kontrolYukle(); }
+      else showToast('⚠️ '+(d.error||'Kapatılamadı'));
+    }catch(e){ showToast('⚠️ Bağlantı hatası'); }
+  });
 }
 
 // Görünen satışları CSV (Excel'de açılır) olarak indir
@@ -3148,9 +3174,10 @@ async function ipEkle(ip, aciklama, kapsam){
   }catch(e){ msg.style.color='#ef4444'; msg.textContent='Sunucu hatası'; }
 }
 function ipCikar(ip){
-  if(!confirm('"'+ip+'" adresini izinli listeden çıkar?\n\nBu IP\'den giren normal kullanıcılar artık giremez.')) return;
-  fetch('/api/ips/remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:authToken, ip})})
-    .then(r=>r.json()).then(d=>{ if(d.ok){ showToast('IP çıkarıldı'); loadIpList(); } else showToast(d.error||'Çıkarılamadı'); });
+  askConfirm('IP çıkar', '"'+ip+'" adresini izinli listeden çıkar? Bu IP\'den giren normal kullanıcılar artık giremez.', 'Çıkar', ()=>{
+    fetch('/api/ips/remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:authToken, ip})})
+      .then(r=>r.json()).then(d=>{ if(d.ok){ showToast('IP çıkarıldı'); loadIpList(); } else showToast(d.error||'Çıkarılamadı'); });
+  });
 }
 document.getElementById('ipMgmtClose').onclick=()=>document.getElementById('ipMgmtModal').classList.remove('show');
 document.getElementById('ipMgmtModal').addEventListener('click',e=>{ if(e.target.id==='ipMgmtModal') document.getElementById('ipMgmtModal').classList.remove('show'); });
@@ -3886,8 +3913,9 @@ function etiketOlustur(){
   document.getElementById('newLabelName').value='';
 }
 function etiketSil(id){
-  if(!confirm('Bu etiket silinsin mi? Tüm gruplardan kaldırılır.')) return;
-  ws.send(JSON.stringify({type:'deleteLabel', id}));
+  askConfirm('Etiketi sil', 'Bu etiket silinsin mi? Tüm gruplardan kaldırılır.', 'Sil', ()=>{
+    ws.send(JSON.stringify({type:'deleteLabel', id}));
+  });
 }
 // SOL taraftaki etiket bolumu (etikete tiklayinca o gruplar filtrelenir)
 let _aktifEtiketFiltre=null;
@@ -4158,8 +4186,9 @@ function renderMessages(c, searchQ){
       const sn=esc(m.sender);
       // OFIS EKIBI ROZETI: adinda PEKCAN/PKC turevleri gecen kisiler ofis ekibidir.
       // (Sunucudan gelen senderOfis bayragi VEYA isim icerigi — ikisinden biri yeterli.)
-      const ofisMu = m.senderOfis || ofisIsmiMi(m.sender);
-      const ofisRozet = ofisMu ? '<span class="ofis-rozet" title="Ofis ekibi">🏢</span>' : '';
+      // GIDEN mesaj (fromMe) = panelden atilmis = KESIN ekip uyesi -> her zaman rozet.
+      const ofisMu = m.fromMe || m.senderOfis || ofisIsmiMi(m.sender);
+      const ofisRozet = ofisMu ? '<span class="ofis-rozet" title="Ofis ekibi / Panel kullanıcısı">🏢</span>' : '';
       if(m.fromMe){
         // GIDEN ekip mesaji: ad sabit etiket (tiklanmaz — bir WhatsApp kisisi degil, ekip uyesi)
         name='<div class="sender-name team-name" style="color:'+colorFor(m.sender)+'">'+ofisRozet+sn+'</div>';
@@ -4360,6 +4389,45 @@ function forwardSelected(){
   fwdMsgIds=[...selectedMsgs]; fwdFromJid=activeJid; fwdSelected.clear();
   acIletmeModali();
 }
+
+// ═══════════════════════════════════════════════════════════
+// TOPLU SİLME: seçili mesajları SIRAYLA sil (aynı anda silmek
+// WhatsApp'ı kasar/bazıları gitmez — tıpkı toplu iletmedeki gibi).
+// ═══════════════════════════════════════════════════════════
+let _topluSilSira=[], _topluSilToplam=0, _topluSilJid=null, _topluSilSonGonderim=0;
+function silSelected(){
+  if(!selectedMsgs.size) return;
+  const n=selectedMsgs.size;
+  const mesaj = n===1 ? 'Bu mesajı herkesten silmek istiyor musun?'
+                      : (n+' mesajı herkesten silmek istiyor musun? Hepsi tek tek silinecek.');
+  askConfirm('Mesajları sil', mesaj, n===1?'Sil':(n+' mesajı sil'), ()=>{
+    _topluSilSira=[...selectedMsgs];
+    _topluSilToplam=_topluSilSira.length;
+    _topluSilJid=activeJid;       // silme sırasında sohbet değişse bile doğru sohbetten sil
+    clearSelection();             // seçim kutularını kaldır
+    if(_topluSilToplam>1) showToast('Siliniyor… (1/'+_topluSilToplam+')');
+    gonderSiradakiSil();
+  });
+}
+function gonderSiradakiSil(){
+  if(!_topluSilSira.length){
+    if(_topluSilToplam>1) showToast('✓ '+_topluSilToplam+' mesaj silindi');
+    _topluSilToplam=0; _topluSilJid=null;
+    return;
+  }
+  const id=_topluSilSira.shift();
+  _topluSilSonGonderim=Date.now();
+  ws.send(JSON.stringify({type:'delete', jid:_topluSilJid, id, agent:benimAdim()}));
+  // GÜVENLİK: opOk/opError gelmezse sıra takılmasın — kısa süre sonra sonrakine geç.
+  // (Silme onayı genelde 1-2sn'de gelir; 6sn'de gelmezse devam et.)
+  setTimeout(()=>{
+    if(_topluSilSira.length && (Date.now()-_topluSilSonGonderim)>=5900){
+      const kalan=_topluSilToplam-_topluSilSira.length+1;
+      if(_topluSilToplam>1) showToast('Siliniyor… ('+kalan+'/'+_topluSilToplam+')');
+      gonderSiradakiSil();
+    }
+  }, 6000);
+}
 // Iletme modalini ac + sifirla (hem secili mesajlardan hem tek mesajdan cagrilir)
 function acIletmeModali(){
   document.getElementById('fwdSearch').value='';
@@ -4515,9 +4583,9 @@ function startEdit(id){
 
 // ---- Silme ----
 function askDelete(id){
-  if(confirm('Bu mesajı herkesten silmek istiyor musun?')){
+  askConfirm('Mesajı sil', 'Bu mesajı herkesten silmek istiyor musun?', 'Sil', ()=>{
     ws.send(JSON.stringify({type:'delete', jid:activeJid, id, agent:benimAdim()}));
-  }
+  });
 }
 
 // ---- Ozelden yanitla (gruptaki mesaja, kisinin DM'inden) ----

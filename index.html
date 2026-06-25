@@ -1447,7 +1447,7 @@
 </div>
 
 <div class="lightbox" id="lightbox">
-  <div class="lb-stage" id="lbStage"><img id="lightboxImg" src="" draggable="false"></div>
+  <div class="lb-stage" id="lbStage"><img id="lightboxImg" src="" draggable="false"><iframe id="lightboxPdf" src="" style="display:none;width:90vw;height:90vh;border:none;border-radius:8px;background:#fff"></iframe></div>
   <div class="lb-toolbar">
     <button id="lbZoomOut" title="Uzaklastir"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg></button>
     <button id="lbReset" title="Sifirla"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg></button>
@@ -4721,18 +4721,32 @@ function belgeOnizle(mediaUrl, ext, thumb, fname){
   ext=(ext||'').toLowerCase();
   const resimMi=['jpg','jpeg','png','webp','gif','bmp'].includes(ext);
   const pdfMi=ext==='pdf';
-  // gercek isimle ac: sunucu 'inline' Content-Disposition + dogru isim verir.
-  // Boylece PDF/resim yeni sekmede ACILIR ve "farkli kaydet" yapinca DOGRU isim gelir.
+  // gercek isimle: sunucu 'inline' + dogru isim verir ("farkli kaydet"te dogru ad gelir)
   const src = mediaUrl + (fname ? ('?name='+encodeURIComponent(fname)) : '');
-  if(pdfMi || resimMi){
-    try{ window.open(src, '_blank'); }
-    catch(e){ if(thumb) openLightbox(thumb); }
+  const img=document.getElementById('lightboxImg');
+  const pdf=document.getElementById('lightboxPdf');
+  if(pdfMi){
+    // PDF: PANEL ICINDE iframe'de goster (yeni sekme degil). X/ESC ile kapanir.
+    if(img) img.style.display='none';
+    if(pdf){ pdf.src=src; pdf.style.display='block'; }
+    lb.classList.add('show');
+  } else if(resimMi){
+    // Resim: normal lightbox (zoom'lu)
+    if(pdf){ pdf.src=''; pdf.style.display='none'; }
+    if(img) img.style.display='';
+    openLightbox(src);
   } else {
     // word/excel vs: tarayicida gosterilemez -> yeni sekmede ac (iner)
     try{ window.open(src, '_blank'); }catch(e){ if(thumb) openLightbox(thumb); }
   }
 }
-function lbClose(){ lb.classList.remove('show'); lbScale=1; lbX=0; lbY=0; lbApply(); }
+function lbClose(){
+  lb.classList.remove('show'); lbScale=1; lbX=0; lbY=0; lbApply();
+  const pdf=document.getElementById('lightboxPdf');
+  const img=document.getElementById('lightboxImg');
+  if(pdf){ pdf.src=''; pdf.style.display='none'; }
+  if(img) img.style.display='';
+}
 document.getElementById('lbClose').onclick=lbClose;
 document.getElementById('lbZoomIn').onclick=()=>{ lbScale=Math.min(5,lbScale+0.3); lbApply(); };
 document.getElementById('lbZoomOut').onclick=()=>{ lbScale=Math.max(1,lbScale-0.3); if(lbScale===1){lbX=0;lbY=0;} lbApply(); };

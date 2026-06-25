@@ -4556,7 +4556,7 @@ function renderMessages(c, searchQ){
     // SECIM MODU: secim aciksa her mesajda bir kutu (○/✓) goster. Tiklayinca sec/birak.
     // SEÇİM DAİRESİ: HER ZAMAN solda görünür (WhatsApp gibi). Sadece bu daireye
     // tıklayınca seçilir/bırakılır; mesajın kendisine tıklamak seçim YAPMAZ.
-    const secimModu = selectedMsgs.size>0;
+    const secimModu = _secimModuAcik || selectedMsgs.size>0;
     const secKutu = '<span class="sec-kutu'+(selectedMsgs.has(m.id)?' dolu':'')+'" onclick="event.stopPropagation();secimToggle(\''+esc(m.id||'')+'\')" title="Seç">'+(selectedMsgs.has(m.id)?'✓':'')+'</span>';
     return sep+'<div class="msg '+cls+grpCls+selCls+menCls+failCls+(secimModu?' secim-modu':'')+'" data-mid="'+esc(m.id||'')+'">'+secKutu+actions+name+fwd+quote+body+reaction+'<span class="meta">'+editedTag+esc(m.time||'')+tik+'</span></div>';
   }).join('');
@@ -4615,8 +4615,14 @@ document.getElementById('messages').addEventListener('dblclick',e=>{
 });
 function updateSelectionBar(){
   const bar=document.getElementById('selectionBar');
-  if(selectedMsgs.size>0){ bar.classList.add('show'); document.getElementById('selCount').textContent=selectedMsgs.size+' seçildi'; }
-  else bar.classList.remove('show');
+  // Çubuk: seçim modu açıksa VEYA seçili mesaj varsa görünür.
+  if(_secimModuAcik || selectedMsgs.size>0){
+    bar.classList.add('show');
+    const n=selectedMsgs.size;
+    document.getElementById('selCount').textContent = n>0 ? (n+' seçildi') : 'Daireden seç';
+  } else {
+    bar.classList.remove('show');
+  }
 }
 // Secim modunda mesaj kutusuna tiklayinca sec/birak
 function secimToggle(id){
@@ -4629,6 +4635,7 @@ function secimToggle(id){
 }
 function clearSelection(){
   selectedMsgs.clear();
+  _secimModuAcik=false;   // seçim modunu kapat (daireler gizlensin)
   document.querySelectorAll('.msg.selected').forEach(el=>el.classList.remove('selected'));
   updateSelectionBar();
   // secim kutularini kaldirmak icin mesajlari yeniden ciz
@@ -4812,12 +4819,16 @@ function clearReply(){ replyTarget=null; editTarget=null; document.getElementByI
 document.getElementById('rpClose').onclick=clearReply;
 
 // Menudeki "Seç" -> coklu secim modunu baslat (o mesaji secili yaparak)
+// Menüdeki "Seç": mesajı SEÇMEZ, sadece SEÇİM MODUNU açar (tüm daireler belirir).
+// Kullanıcı seçimi dairelerden kendi yapar.
+let _secimModuAcik=false;
 function startSelect(id){
-  const el=document.querySelector('.msg[data-mid="'+CSS.escape(id)+'"]');
-  selectedMsgs.add(id);
-  if(el) el.classList.add('selected');
-  // acik menuleri kapat
+  _secimModuAcik=true;
+  // açık menüleri kapat
   document.querySelectorAll('.msg-actions.open').forEach(m=>m.classList.remove('open'));
+  // mesajları yeniden çiz ki tüm daireler görünsün (mesaj SEÇİLMEZ)
+  const c=chats[activeJid];
+  if(c) renderMessagesDebounced(c);
   updateSelectionBar();
 }
 
@@ -5906,8 +5917,8 @@ document.addEventListener('click',(e)=>{
 // Escape: once mesaj secimi, sonra modal, sonra panel
 document.addEventListener('keydown',(e)=>{
   if(e.key!=='Escape') return;
-  // 1) Mesaj secimi aktifse (iletmek icin secim yapildiysa) ONCE onu iptal et.
-  if(typeof selectedMsgs!=='undefined' && selectedMsgs.size>0){ clearSelection(); return; }
+  // 1) Seçim modu aktifse (Seç'e basıldı VEYA mesaj seçildi) ONCE onu iptal et.
+  if((typeof _secimModuAcik!=='undefined' && _secimModuAcik) || (typeof selectedMsgs!=='undefined' && selectedMsgs.size>0)){ clearSelection(); return; }
   if(document.getElementById('qrMgmtModal').classList.contains('show')){ qrMgmtClose(); return; }
   if(document.getElementById('qrPanel').classList.contains('show')) qrClose();
 });

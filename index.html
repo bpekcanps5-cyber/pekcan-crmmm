@@ -1853,10 +1853,27 @@ function connect(){
     else if(d.type==='typing'){ handleTyping(d); }
     else if(d.type==='openChat'){ setTimeout(()=>{ if(chats[d.jid]) openChat(d.jid); }, 250); }
     else if(d.type==='forwardResult'){
-      showToast(d.ok?('✓ '+d.count+' sohbete iletildi'):'İletilemedi');
       // İletilen sohbeti AC ki kullanici mesajin gittigini aninda gorsun.
       if(d.ok && d.acilacakJid && chats[d.acilacakJid]){
         setTimeout(()=>{ if(chats[d.acilacakJid]) openChat(d.acilacakJid); }, 300);
+      }
+      // SIRALI ILETME: bir mesaj bitti -> sıradakini gönder (PDF cakismasini onler).
+      // _fwdSiraToplam>1 ise coklu sira var demektir; her adim toast'i sira fonksiyonu basar.
+      if(typeof _fwdSira!=='undefined' && (_fwdSira.length || _fwdSiraToplam>1)){
+        _fwdSiraKalan=Math.max(0,_fwdSiraKalan-1);
+        // hala gonderilecek mesaj varsa ilerlemeyi goster + sonrakini gonder
+        if(_fwdSira.length){
+          const gonderilen=_fwdSiraToplam-_fwdSira.length+1;
+          showToast('İletiliyor… ('+gonderilen+'/'+_fwdSiraToplam+')');
+          gonderSiradakiForward();
+        } else {
+          // son mesaj da bitti
+          gonderSiradakiForward(); // bitis toast'ini basar
+          _fwdSiraToplam=0;
+        }
+      } else {
+        // TEK mesaj iletildi (eski davranis): tek toast
+        showToast(d.ok?('✓ '+d.count+' sohbete iletildi'):'İletilemedi');
       }
     }
     else if(d.type==='syncStatus'){ handleSyncStatus(d); }
@@ -2352,9 +2369,25 @@ function satistanGrubaGit(ev, jid, ad){
 // Grup adını panoya kopyala (telefondan grubu aratmak için)
 function grupAdiKopyala(ev, ad){
   ev.stopPropagation();
+  // EMOJI TEMIZLE: grup adinda emoji varsa kopyalamadan once cikar (kullanici istegi).
+  // Emoji aralikları + varyasyon seçici + ZWJ + bayraklar temizlenir; harf/rakam/Türkçe kalir.
+  const temiz=emojiTemizle(ad);
   try{
-    navigator.clipboard.writeText(ad).then(()=>showToast('📋 Grup adı kopyalandı'),()=>fallbackKopya(ad));
-  }catch(e){ fallbackKopya(ad); }
+    navigator.clipboard.writeText(temiz).then(()=>showToast('📋 Grup adı kopyalandı'),()=>fallbackKopya(temiz));
+  }catch(e){ fallbackKopya(temiz); }
+}
+// Bir metinden emoji/simge karakterlerini cikarip duz metin dondurur.
+function emojiTemizle(metin){
+  if(!metin) return '';
+  let s=String(metin);
+  try{
+    s=s.replace(/[\u{1F000}-\u{1FAFF}\u{1F300}-\u{1F5FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{1F1E6}-\u{1F1FF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{2190}-\u{21FF}\u{2300}-\u{23FF}]/gu,'');
+  }catch(e){
+    // cok eski tarayici (unicode regex desteklemiyorsa): sadece bilinen aralik
+    s=s.replace(/[\u2600-\u27BF\uFE00-\uFE0F\u200D]/g,'');
+  }
+  // arta kalan cift bosluklari/bas-son bosluklari toparla
+  return s.replace(/\s+/g,' ').trim();
 }
 function fallbackKopya(metin){
   const ta=document.createElement('textarea'); ta.value=metin; ta.style.position='fixed'; ta.style.opacity='0';
@@ -4297,15 +4330,43 @@ document.getElementById('fwdCancel').onclick=()=>document.getElementById('forwar
 document.getElementById('forwardModal').addEventListener('click',e=>{ if(e.target.id==='forwardModal') document.getElementById('forwardModal').classList.remove('show'); });
 document.getElementById('fwdGo').onclick=()=>{
   if(!fwdSelected.size){ showToast('En az bir sohbet seç'); return; }
-  // her secili mesaji, her hedefe ilet
-  fwdMsgIds.forEach(mid=>{
-    ws.send(JSON.stringify({type:'forward', fromJid:fwdFromJid, msgId:mid, targets:[...fwdSelected], agent:benimAdim()}));
-  });
-  const n=fwdSelected.size;
+  // SIRALI ILETME: mesajlari AYNI ANDA gondermek (ozellikle 2 PDF/medya) WhatsApp'ta
+  // cakismaya yol aciyordu -> biri sessizce dusuyordu ("bazen gitmiyor"). Cozum: her
+  // mesaji SIRAYLA gonder; biri bitince (forwardResult gelince) sonrakine gec. Boylece
+  // iki PDF de saglam gider. Tek mesajda davranis aynidir (aninda gider).
+  const hedefler=[...fwdSelected];
+  const sira=[...fwdMsgIds];          // gonderilecek mesajlar (sirayla)
+  const n=hedefler.length;
   document.getElementById('forwardModal').classList.remove('show');
   clearSelection();
-  showToast('✓ '+n+' sohbete iletildi');
+  _fwdSiraToplam=sira.length;
+  _fwdSiraKalan=sira.length;
+  if(sira.length>1) showToast('İletiliyor… (1/'+sira.length+')');
+  // sirayi baslat: ilk mesaji gonder, gerisi forwardResult geldikce gidecek
+  _fwdSira=sira;
+  _fwdSiraHedefler=hedefler;
+  _fwdSiraN=n;
+  gonderSiradakiForward();
 };
+// Sirali iletme durumu (ayni anda tek mesaj gonderilir, cakisma olmaz)
+let _fwdSira=[], _fwdSiraHedefler=[], _fwdSiraN=0, _fwdSiraToplam=0, _fwdSiraKalan=0;
+let _fwdSonGonderim=0;
+function gonderSiradakiForward(){
+  if(!_fwdSira.length){
+    // hepsi bitti
+    if(_fwdSiraToplam>1) showToast('✓ '+_fwdSiraN+' sohbete iletildi ('+_fwdSiraToplam+' mesaj)');
+    else showToast('✓ '+_fwdSiraN+' sohbete iletildi');
+    return;
+  }
+  const mid=_fwdSira.shift();
+  _fwdSonGonderim=Date.now();
+  ws.send(JSON.stringify({type:'forward', fromJid:fwdFromJid, msgId:mid, targets:[..._fwdSiraHedefler], agent:benimAdim()}));
+  // GUVENLIK: forwardResult bir sebeple gelmezse (baglanti) sira takilmasin —
+  // 90sn icinde cevap gelmezse otomatik sonrakine gec.
+  setTimeout(()=>{
+    if(_fwdSira.length && (Date.now()-_fwdSonGonderim)>=89000) gonderSiradakiForward();
+  }, 90000);
+}
 
 // ---- Rail filtreleri (sol kenar) ----
 function railFilter(f, el){

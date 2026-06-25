@@ -3840,9 +3840,27 @@ async function startWA(lineId = 'ofis') {
       // Medya indip diske yazilinca addMessage'i ayni id ile tekrar cagiririz;
       // addMessage var olan mesajin mediaUrl'unu doldurup panele + DB'ye yansitir.
       if (hasMedia) {
-        saveMedia(m, info.kind, sock).then((url) => {
-          if (url) addMessage(jid, { id: m.key.id, mediaUrl: url, fromMe }, {}, lineId);
-        }).catch((e) => console.error('   ⚠️  arka plan medya indirme hatasi:', e.message));
+        // RETRY'LI medya indirme: ilk denemede inmezse (ag/zaman asimi) birkac kez
+        // tekrar dene. Eskiden tek deneme vardi -> inmeyen GORSEL/medya KALICI eksik
+        // kaliyordu (kullanici "eksik gorsel" sikayeti). Artik 4 deneme + artan bekleme.
+        const medyaIndirRetry = async (deneme = 1) => {
+          try {
+            const url = await saveMedia(m, info.kind, sock);
+            if (url) {
+              addMessage(jid, { id: m.key.id, mediaUrl: url, fromMe }, {}, lineId);
+              return; // basarili
+            }
+          } catch (e) { /* asagida tekrar denenecek */ }
+          // basarisiz: en fazla 4 deneme, her seferinde biraz daha bekle (4s, 8s, 16s)
+          if (deneme < 4) {
+            const bekle = 4000 * Math.pow(2, deneme - 1); // 4s, 8s, 16s
+            console.log(`   ⏳ medya inmedi (deneme ${deneme}/4), ${bekle/1000}sn sonra tekrar: ${String(m.key.id).slice(0,10)}`);
+            setTimeout(() => medyaIndirRetry(deneme + 1), bekle);
+          } else {
+            console.error(`   ❌ medya 4 denemede inmedi, vazgecildi: ${String(m.key.id).slice(0,10)} (${info.kind})`);
+          }
+        };
+        medyaIndirRetry(1);
       }
       // Avatar daha onceden yoksa arka planda cek (sohbet basligi/listesi icin)
       if (!avatarUrl) {

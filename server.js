@@ -358,6 +358,30 @@ app.post('/api/users/delete', express.json(), async (req, res) => {
   res.json(r);
 });
 
+// Kullanici DUZENLE: gorunen ad / giris adi / sifre (sadece yonetici).
+// Sadece gonderilen alanlar degisir. Sifre bos gonderilirse degismez.
+app.post('/api/users/update', express.json(), async (req, res) => {
+  if (!isAdmin(req.body?.token)) return res.json({ ok: false, error: 'Yetki yok' });
+  const id = req.body?.id;
+  if (!id) return res.json({ ok: false, error: 'Kullanıcı seçili değil' });
+  const r = await db.updateUser(id, {
+    displayName: req.body?.displayName,
+    username: req.body?.username,
+    password: req.body?.password,
+  });
+  if (r.ok && r.username && r.eskiUsername && r.username !== r.eskiUsername) {
+    // GIRIS ADI degisti: bellekteki oturumlarda da username'i guncelle (yoksa o kullanici
+    // bir sonraki istekte taninmaz). Acik oturumlarini yeni ada tasi.
+    for (const [tok, s] of sessions) {
+      if (s.username === r.eskiUsername) s.username = r.username;
+    }
+    console.log(`✏️  Kullanici guncellendi: ${r.eskiUsername} -> ${r.username}`);
+  } else if (r.ok) {
+    console.log(`✏️  Kullanici bilgileri guncellendi (id: ${id})`);
+  }
+  res.json(r);
+});
+
 // MEVCUT kullanicinin HAT TIPINI degistir (ofis <-> pazarlama). Sadece yonetici.
 // Kullanim: eski/yanlis eslenmis kullaniciyi pazarlamaya cevirmek icin
 // (orn. Volkan 'ofis'e dusmus -> pazarlamaya al, kendi hatti olsun).

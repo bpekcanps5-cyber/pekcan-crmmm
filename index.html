@@ -515,15 +515,29 @@
   .msg-actions button.danger{color:#dc2626}
   .msg-actions button.danger:hover{background:#fee2e2;color:#dc2626}
   .msg-actions button svg{width:17px;height:17px;flex-shrink:0}
-  .msg .sender-name{font-size:14px;font-weight:800;margin-bottom:4px;letter-spacing:-.2px;display:flex;align-items:center;gap:4px}
+  .msg .sender-name{font-size:14px;font-weight:800;margin-bottom:5px;letter-spacing:-.2px;display:flex;align-items:center;gap:4px}
   .msg .sender-name.clickable{cursor:pointer}
   .msg .sender-name.clickable:hover{text-decoration:underline}
-  /* ofis ekibi rozeti: gruptaki normal kisilerden ayirt etmek icin */
-  .ofis-rozet{font-size:11px;opacity:.9;flex-shrink:0}
-  /* ofis uyesinin adi: hafif arka plan + cizgi ile one cikar */
-  .msg .sender-name.ofis-uye{padding:1px 7px;border-radius:6px;background:rgba(34,197,94,.13);border-left:3px solid var(--brand)}
-  /* GIDEN ekip mesaji adi: panel kullanicisi belli olsun (hafif vurgu) */
-  .msg .sender-name.team-name{padding:1px 7px;border-radius:6px;background:rgba(34,197,94,.13);border-left:3px solid var(--brand);display:inline-flex;align-items:center;gap:4px;width:fit-content}
+  /* ofis ekibi rozeti: küçük yeşil yuvarlak içinde kalkan ikonu (şık, kurumsal) */
+  .ofis-rozet{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--brand);color:#fff;flex-shrink:0;font-size:9px}
+  .ofis-rozet svg{width:10px;height:10px}
+  /* EKİP ÜYESİ adı (hem giden hem gelen): şık pill rozet — kendi satırında, isim kadar geniş */
+  .msg .sender-name.ofis-uye,
+  .msg .sender-name.team-name{
+    display:inline-flex;align-items:center;gap:5px;width:fit-content;max-width:100%;
+    padding:3px 10px 3px 4px;border-radius:20px;
+    background:linear-gradient(90deg,color-mix(in srgb,var(--brand) 22%,transparent),color-mix(in srgb,var(--brand) 8%,transparent));
+    border:1px solid color-mix(in srgb,var(--brand) 35%,transparent);
+    font-size:13px;font-weight:700;
+    color:var(--ink) !important;
+  }
+  /* koyu temalarda ink koyu olabilir; metni parlak tut */
+  html[data-skin] .msg .sender-name.ofis-uye, html[data-skin] .msg .sender-name.team-name,
+  html[data-theme="dark"] .msg .sender-name.ofis-uye, html[data-theme="dark"] .msg .sender-name.team-name{
+    color:var(--text) !important;
+  }
+  /* giden mesaj kendi balonunda; ad rozeti sola yaslı kalsın */
+  .msg.out .sender-name.team-name{margin-left:0}
   /* *kalin* metin: renkli ve kalin (WhatsApp tarzi vurgu) */
   /* *kalin* metin: renkli, canli, kalin (animasyonsuz, sabit) */
   .md-bold{
@@ -1559,6 +1573,34 @@
 
     <div class="modal-btns" style="margin-top:18px">
       <button class="btn ghost" id="qrMgmtClose">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<!-- KULLANICI DÜZENLE: isim / giriş adı / şifre -->
+<div class="modal-bg" id="userEditModal">
+  <div class="modal" style="width:440px;max-width:94vw">
+    <h3>Kullanıcıyı Düzenle</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Değiştirmek istediğin alanları doldur. <b>Şifreyi boş bırakırsan değişmez.</b></p>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div>
+        <label style="font-size:12.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Görünen ad</label>
+        <input type="text" id="editUserName" class="um-input" placeholder="Örn: Burak Pekcan" style="width:100%">
+      </div>
+      <div>
+        <label style="font-size:12.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Giriş adı (kullanıcı adı)</label>
+        <input type="text" id="editUserLogin" class="um-input" placeholder="giriş için kullanılan ad" autocomplete="off" style="width:100%">
+        <div style="font-size:11.5px;color:var(--faint);margin-top:4px">⚠️ Giriş adını değiştirirsen kullanıcı yeni adıyla girmeli.</div>
+      </div>
+      <div>
+        <label style="font-size:12.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">Yeni şifre</label>
+        <input type="text" id="editUserPass" class="um-input" placeholder="boş bırakırsan değişmez" autocomplete="new-password" style="width:100%">
+      </div>
+    </div>
+    <div id="editUserMsg" style="font-size:13px;min-height:16px;margin-top:10px"></div>
+    <div class="modal-btns" style="margin-top:14px">
+      <button class="btn ghost" onclick="document.getElementById('userEditModal').classList.remove('show')">Vazgeç</button>
+      <button class="btn primary" id="editUserSaveBtn" onclick="userDuzenleKaydet()">Kaydet</button>
     </div>
   </div>
 </div>
@@ -3048,12 +3090,15 @@ async function loadUserList(){
       else rozet='<span class="um-badge agent">Temsilci</span>';
       let actions='';
       if(!benim){
+        // DÜZENLE (isim/şifre/giriş adı)
+        actions+='<button class="um-btn" onclick="userDuzenleAc('+u.id+',\''+esc(u.username).replace(/'/g,"\\'")+'\',\''+esc(u.display_name||'').replace(/'/g,"\\'")+'\')">Düzenle</button>';
         // yonetici yap / geri al
         if(u.role==='admin') actions+='<button class="um-btn" onclick="setRole('+u.id+',\'agent\')">Yöneticiliği al</button>';
         else actions+='<button class="um-btn" onclick="setRole('+u.id+',\'admin\')">Yönetici yap</button>';
         actions+='<button class="um-btn danger" onclick="delUser('+u.id+',\''+esc(u.username)+'\')">Sil</button>';
       } else {
-        actions='<span style="font-size:11px;color:var(--faint)">sen</span>';
+        // KENDİNİ de düzenleyebilsin (isim/şifre değiştir)
+        actions='<button class="um-btn" onclick="userDuzenleAc('+u.id+',\''+esc(u.username).replace(/'/g,"\\'")+'\',\''+esc(u.display_name||'').replace(/'/g,"\\'")+'\')">Düzenle</button><span style="font-size:11px;color:var(--faint);margin-left:6px">sen</span>';
       }
       return '<div class="um-row"><div class="um-info"><span class="um-name">'+esc(u.display_name||u.username)+' '+rozet+'</span><span class="um-meta">@'+esc(u.username)+'</span></div><div class="um-actions">'+actions+'</div></div>';
     }).join('');
@@ -3095,6 +3140,41 @@ function delUser(id,uname){
       .then(r=>r.json()).then(d=>{ if(d.ok){ showToast('Kullanıcı silindi'); loadUserList(); } else showToast(d.error||'Silinemedi'); });
   });
 }
+
+// ─── KULLANICI DÜZENLE (isim / giriş adı / şifre) ───
+let _editUserId=null;
+function userDuzenleAc(id, username, displayName){
+  _editUserId=id;
+  document.getElementById('editUserName').value=displayName||'';
+  document.getElementById('editUserLogin').value=username||'';
+  document.getElementById('editUserPass').value='';
+  document.getElementById('editUserMsg').textContent='';
+  document.getElementById('userEditModal').classList.add('show');
+  setTimeout(()=>document.getElementById('editUserName').focus(),100);
+}
+async function userDuzenleKaydet(){
+  if(!_editUserId) return;
+  const displayName=document.getElementById('editUserName').value.trim();
+  const username=document.getElementById('editUserLogin').value.trim();
+  const password=document.getElementById('editUserPass').value;
+  const msg=document.getElementById('editUserMsg');
+  const btn=document.getElementById('editUserSaveBtn');
+  msg.style.color='#dc2626';
+  if(!username){ msg.textContent='Giriş adı boş olamaz'; return; }
+  btn.disabled=true; btn.textContent='Kaydediliyor…';
+  try{
+    const r=await fetch('/api/users/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:authToken, id:_editUserId, displayName, username, password})});
+    const d=await r.json();
+    if(d.ok){
+      showToast('✓ Kullanıcı güncellendi');
+      document.getElementById('userEditModal').classList.remove('show');
+      loadUserList();
+    } else { msg.textContent=d.error||'Güncellenemedi'; }
+  }catch(e){ msg.textContent='Sunucu hatası'; }
+  btn.disabled=false; btn.textContent='Kaydet';
+}
+// modal dışına tıkla = kapat
+document.getElementById('userEditModal').addEventListener('click',e=>{ if(e.target.id==='userEditModal') document.getElementById('userEditModal').classList.remove('show'); });
 document.getElementById('userMgmtClose').onclick=()=>document.getElementById('userMgmtModal').classList.remove('show');
 
 // ---- IZINLI IP YONETIMI (iki liste: ofis / disari) ----
@@ -4188,7 +4268,7 @@ function renderMessages(c, searchQ){
       // (Sunucudan gelen senderOfis bayragi VEYA isim icerigi — ikisinden biri yeterli.)
       // GIDEN mesaj (fromMe) = panelden atilmis = KESIN ekip uyesi -> her zaman rozet.
       const ofisMu = m.fromMe || m.senderOfis || ofisIsmiMi(m.sender);
-      const ofisRozet = ofisMu ? '<span class="ofis-rozet" title="Ofis ekibi / Panel kullanıcısı">🏢</span>' : '';
+      const ofisRozet = ofisMu ? '<span class="ofis-rozet" title="Ofis ekibi / Panel kullanıcısı"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></span>' : '';
       if(m.fromMe){
         // GIDEN ekip mesaji: ad sabit etiket (tiklanmaz — bir WhatsApp kisisi degil, ekip uyesi)
         name='<div class="sender-name team-name" style="color:'+colorFor(m.sender)+'">'+ofisRozet+sn+'</div>';

@@ -614,6 +614,50 @@ async function setUserRole(id, role) {
   catch (e) { return { ok: false, error: e.message }; }
 }
 
+// Kullanicinin GORUNEN ADINI, GIRIS ADINI ve/veya SIFRESINI guncelle (yonetici).
+// Sadece verilen alanlar degisir (bos birakilanlara dokunulmaz).
+// Donus: { ok, error?, username? } — username degistiyse yeni adi doner (oturum/hat eslemesi icin).
+async function updateUser(id, { displayName, username, password } = {}) {
+  if (!aktif) return { ok: false, error: 'Veritabanı kapalı' };
+  try {
+    // once mevcut kullaniciyi al (eski giris adini bilmek icin — hat eslemesi guncellenecek)
+    const mevcut = await pool.query('SELECT username FROM users WHERE id=$1', [id]);
+    if (!mevcut.rows.length) return { ok: false, error: 'Kullanıcı bulunamadı' };
+    const eskiUsername = mevcut.rows[0].username;
+
+    const setler = [];
+    const params = [];
+    let i = 1;
+    if (displayName !== undefined && displayName !== null && String(displayName).trim()) {
+      setler.push(`display_name=$${i++}`); params.push(String(displayName).trim());
+    }
+    let yeniUsername = null;
+    if (username !== undefined && username !== null && String(username).trim() && String(username).trim() !== eskiUsername) {
+      yeniUsername = String(username).trim();
+      setler.push(`username=$${i++}`); params.push(yeniUsername);
+    }
+    if (password !== undefined && password !== null && String(password).length) {
+      setler.push(`password=$${i++}`); params.push(String(password));
+    }
+    if (!setler.length) return { ok: false, error: 'Değiştirilecek bir şey yok' };
+    params.push(id);
+    await pool.query(`UPDATE users SET ${setler.join(', ')} WHERE id=$${i}`, params);
+
+    // GIRIS ADI degistiyse: kullanici_hatlari ve sessions tablolarindaki eslemeyi de guncelle
+    // (yoksa kullanici eski adiyla hatta bagli kalir / oturumu kopar).
+    if (yeniUsername) {
+      try { await pool.query('UPDATE kullanici_hatlari SET username=$1 WHERE username=$2', [yeniUsername, eskiUsername]); } catch (e) {}
+      try { await pool.query('UPDATE sessions SET username=$1 WHERE username=$2', [yeniUsername, eskiUsername]); } catch (e) {}
+    }
+    return { ok: true, username: yeniUsername || eskiUsername, eskiUsername };
+  } catch (e) {
+    if ((e.message || '').includes('duplicate') || e.code === '23505') {
+      return { ok: false, error: 'Bu kullanıcı adı zaten var' };
+    }
+    return { ok: false, error: e.message };
+  }
+}
+
 // ============================================================
 // OTURUMLAR (sessions) — token'lar Supabase'de saklanir
 // Boylece sunucu yeniden baslayinca kimse "yetki yok" almaz / atilmaz.
@@ -959,7 +1003,7 @@ module.exports = {
   saveChat, saveMessage, saveContact, saveSetting, getSetting,
   loadAll, loadMessages, deleteMessage, wipeAll, wipeGroups,
   cleanupOld, startCleanup,
-  ensureAdmin, checkLogin, addUser, listUsers, deleteUser, setUserRole,
+  ensureAdmin, checkLogin, addUser, listUsers, deleteUser, setUserRole, updateUser,
   saveInternalMessage, loadInternalConversation, listInternalConversations,
   markInternalRead, internalUnreadCount,
   saveSession, loadSessions, deleteSession, updateSessionRole,

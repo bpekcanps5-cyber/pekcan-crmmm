@@ -35,10 +35,12 @@
     /* Cizgi & golge */
     --border:#e9edef;
     --border-soft:#f0f2f5;
-    --shadow-xs:0 1px .5px rgba(11,20,26,.13);
-    --shadow:0 1px 3px rgba(11,20,26,.13);
-    --shadow-md:0 4px 12px rgba(11,20,26,.15);
-    --shadow-lg:0 8px 30px rgba(11,20,26,.20);
+    /* Premium çok-katmanlı yumuşak gölgeler (derinlik hissi) */
+    --shadow-xs:0 1px 2px rgba(11,20,26,.06), 0 1px 1px rgba(11,20,26,.04);
+    --shadow:0 1px 2px rgba(11,20,26,.05), 0 2px 6px rgba(11,20,26,.08);
+    --shadow-sm:0 2px 4px rgba(11,20,26,.05), 0 4px 12px rgba(11,20,26,.07);
+    --shadow-md:0 4px 8px rgba(11,20,26,.06), 0 8px 24px rgba(11,20,26,.10);
+    --shadow-lg:0 8px 16px rgba(11,20,26,.08), 0 16px 48px rgba(11,20,26,.16);
 
     /* Durum */
     --unread:#25d366;         /* okunmamis rozet yesili */
@@ -59,10 +61,12 @@
     --in:#202c33; --out:#005c4b;
     --text:#e9edef; --muted:#8696a0; --faint:#667781;
     --border:#222d34; --border-soft:#1d272e;
-    --shadow-xs:0 1px .5px rgba(0,0,0,.2);
-    --shadow:0 2px 10px rgba(0,0,0,.35);
-    --shadow-md:0 6px 20px rgba(0,0,0,.45);
-    --shadow-lg:0 14px 40px rgba(0,0,0,.6);
+    /* Premium çok-katmanlı gölgeler (koyu tema — daha derin) */
+    --shadow-xs:0 1px 2px rgba(0,0,0,.25), 0 1px 1px rgba(0,0,0,.18);
+    --shadow:0 2px 6px rgba(0,0,0,.30), 0 1px 3px rgba(0,0,0,.22);
+    --shadow-sm:0 2px 8px rgba(0,0,0,.30), 0 4px 14px rgba(0,0,0,.25);
+    --shadow-md:0 6px 16px rgba(0,0,0,.38), 0 10px 30px rgba(0,0,0,.30);
+    --shadow-lg:0 12px 28px rgba(0,0,0,.45), 0 24px 60px rgba(0,0,0,.40);
     --unread:#14b8a6; --group:#5ba3e0;
   }
   /* ===== 4 TEMA (accent) — WhatsApp tabanli, acik mod =====
@@ -440,9 +444,9 @@
   .iup-item{display:flex;align-items:center;gap:12px;padding:9px 11px;border-radius:10px;cursor:pointer;transition:background .12s}
   .iup-item:hover{background:var(--brand-soft)}
   .list-section{font-size:10.5px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.8px;padding:14px 12px 6px}
-  .chat{display:flex;gap:14px;padding:12px 13px;cursor:pointer;border-radius:15px;position:relative;margin-bottom:3px;transition:all .14s}
+  .chat{display:flex;gap:14px;padding:12px 13px;cursor:pointer;border-radius:15px;position:relative;margin-bottom:3px;transition:all .18s cubic-bezier(.2,.8,.2,1)}
   .chat:hover{background:var(--panel-2)}
-  .chat.active{background:var(--brand-soft)}
+  .chat.active{background:var(--brand-soft);box-shadow:var(--shadow-xs)}
   .chat.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:4px;height:60%;background:var(--brand);border-radius:0 4px 4px 0}
   .chat-avatar{width:54px;height:54px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;color:#fff;font-weight:700;font-size:19px;position:relative;background-size:cover;background-position:center;background-repeat:no-repeat;box-shadow:var(--shadow-xs)}
   .chat-avatar.has-img{background-color:transparent!important;overflow:hidden}
@@ -896,7 +900,7 @@
   /* Liste etiket noktalari */
   .liste-etiketler{display:inline-flex;gap:3px;margin-right:6px;vertical-align:middle}
   .liste-etiket-nokta{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:0 0 0 1.5px var(--panel)}
-  .modal{background:var(--panel);border-radius:8px;padding:30px;width:400px;max-width:90%;box-shadow:var(--shadow-lg);animation:modalIn .13s ease-out}
+  .modal{background:var(--panel);border-radius:18px;padding:30px;width:400px;max-width:90%;box-shadow:var(--shadow-lg);animation:modalIn .13s ease-out;border:1px solid var(--border-soft)}
   @keyframes modalIn{from{opacity:0}to{opacity:1}}
   .modal h3{font-size:19px;font-weight:800;margin-bottom:6px;letter-spacing:-.4px}
   .modal p{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.55}

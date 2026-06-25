@@ -316,6 +316,65 @@
   .perf-kisi-sayi .pks-buyuk{font-size:28px;font-weight:800;color:var(--brand);line-height:1}
   .perf-kisi-sayi .pks-etiket{font-size:10.5px;color:var(--muted);font-weight:600;margin-top:2px}
   .perf-bos{text-align:center;padding:50px 20px;color:var(--faint);font-size:14px;line-height:1.6}
+  /* özet kart ikonu */
+  .perf-ozet-kart .poz-ikon{font-size:20px;margin-bottom:4px;opacity:.9}
+  /* ── LİDER KARTI (pano üstü) ── */
+  .perf-lider{display:flex;align-items:center;gap:16px;padding:18px 22px;border-radius:18px;margin-bottom:20px;
+    background:linear-gradient(120deg,color-mix(in srgb,#f5b50a 18%,var(--panel)),var(--panel));
+    border:1px solid color-mix(in srgb,#f5b50a 40%,transparent);box-shadow:0 4px 20px color-mix(in srgb,#f5b50a 12%,transparent)}
+  .perf-lider .lider-kupa{font-size:42px;line-height:1;filter:drop-shadow(0 2px 4px rgba(245,181,10,.4))}
+  .perf-lider .lider-bilgi{flex:1;min-width:0}
+  .perf-lider .lider-etiket{font-size:11.5px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.5px}
+  .perf-lider .lider-ad{font-size:22px;font-weight:800;color:var(--text);margin:2px 0;letter-spacing:-.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .perf-lider .lider-fark{display:inline-block;font-size:12.5px;color:var(--muted);font-weight:600}
+  .perf-lider .lider-sayi{flex-shrink:0;font-size:38px;font-weight:800;color:#d97706;line-height:1;text-align:center;letter-spacing:-1px}
+  .perf-lider .lider-sayi small{display:block;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0}
+  /* ── KİŞİ LİSTESİ (barlı, tıklanır) ── */
+  .perf-liste{display:flex;flex-direction:column;gap:0}
+  .perf-kisi{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:13px 16px;margin-bottom:8px;cursor:pointer;transition:all .15s;position:relative}
+  .perf-kisi:hover{border-color:var(--brand);transform:translateX(2px)}
+  .perf-kisi.secili{border-color:var(--brand);border-bottom-left-radius:0;border-bottom-right-radius:0;margin-bottom:0}
+  .perf-kisi.birinci{background:linear-gradient(90deg,rgba(245,181,10,.08),var(--panel))}
+  .perf-sira{font-size:21px;font-weight:800;min-width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--panel-2);color:var(--muted);flex-shrink:0}
+  .perf-kisi.birinci .perf-sira,.perf-kisi.ikinci .perf-sira,.perf-kisi.ucuncu .perf-sira{background:transparent;font-size:26px}
+  .perf-kisi-orta{flex:1;min-width:0}
+  .perf-kisi-ust{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+  .perf-kisi-ad{font-size:15.5px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .perf-kisi-grup{font-size:11px;color:var(--muted);font-weight:600;flex-shrink:0;background:var(--panel-2);padding:2px 8px;border-radius:7px}
+  /* görsel bar */
+  .perf-bar-dis{height:7px;background:var(--panel-2);border-radius:5px;overflow:hidden;margin-bottom:7px}
+  .perf-bar-ic{height:100%;background:linear-gradient(90deg,var(--brand),color-mix(in srgb,var(--brand) 60%,#22d3ee));border-radius:5px;transition:width .5s cubic-bezier(.2,.8,.2,1)}
+  .perf-kisi.birinci .perf-bar-ic{background:linear-gradient(90deg,#f5b50a,#fbbf24)}
+  .perf-kisi-detay{display:flex;flex-wrap:wrap;gap:5px}
+  .perf-kisi-sayi{text-align:center;flex-shrink:0;min-width:58px}
+  .perf-kisi-sayi .pks-buyuk{font-size:26px;font-weight:800;color:var(--brand);line-height:1}
+  .perf-kisi.birinci .pks-buyuk{color:#d97706}
+  .perf-kisi-sayi .pks-etiket{font-size:10px;color:var(--muted);font-weight:600;margin-top:1px}
+  .perf-kisi-sayi .pks-ok{font-size:11px;color:var(--faint);margin-top:3px;transition:transform .2s}
+  .perf-kisi.secili .pks-ok{transform:rotate(180deg);color:var(--brand)}
+  /* ── KİŞİ DETAYI (akordeon) ── */
+  .perf-detay{max-height:0;overflow:hidden;background:var(--panel);border:1px solid var(--brand);border-top:none;border-radius:0 0 14px 14px;margin-bottom:8px;transition:max-height .3s ease}
+  .perf-detay.acik{max-height:1200px}
+  .perf-detay .pd-ic{padding:4px 18px 18px}
+  .pd-ozet{display:flex;gap:10px;flex-wrap:wrap;padding:14px 0;border-bottom:1px dashed var(--border);margin-bottom:14px}
+  .pd-oz{flex:1;min-width:64px;text-align:center;background:var(--panel-2);border-radius:11px;padding:10px 6px}
+  .pd-oz b{display:block;font-size:21px;font-weight:800;color:var(--text);line-height:1}
+  .pd-oz span{font-size:11px;color:var(--muted);font-weight:600}
+  .pd-baslik{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 10px}
+  /* branş mini barlar */
+  .pd-brans-liste{display:flex;flex-direction:column;gap:8px}
+  .pd-brans{display:flex;align-items:center;gap:10px}
+  .pd-brans-ad{font-size:13px;font-weight:600;color:var(--text);min-width:80px}
+  .pd-brans-bar{flex:1;height:8px;background:var(--panel-2);border-radius:5px;overflow:hidden}
+  .pd-brans-dolu{height:100%;background:linear-gradient(90deg,var(--brand),color-mix(in srgb,var(--brand) 55%,#22d3ee));border-radius:5px}
+  .pd-brans-sayi{font-size:13px;font-weight:800;color:var(--brand);min-width:24px;text-align:right}
+  /* grup dökümü */
+  .pd-grup-liste{display:flex;flex-direction:column;gap:6px}
+  .pd-grup{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel-2);border-radius:10px;padding:9px 13px}
+  .pd-grup-ad{font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .pd-grup-sag{display:flex;gap:5px;flex-shrink:0}
+  .pd-grup-rozet{font-size:11px;font-weight:700;padding:2px 8px;border-radius:7px;background:var(--panel);color:var(--muted)}
+  .pd-grup-rozet.ana{background:var(--brand-soft);color:var(--brand)}
   /* satış listesi */
   .kontrol-liste{flex:1;overflow-y:auto;padding:0 20px 20px}
   .satis-grup-baslik{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:14px 2px 8px;position:sticky;top:0;background:var(--bg)}
@@ -2337,44 +2396,136 @@ function performansCiz(d){
   if(!alan) return;
   const t=d.toplam||{};
   const liste=d.liste||[];
+  _perfListe=liste; // detay açmak için sakla
   const kapsamAd = ({bugun:'Bugün',hafta:'Bu hafta',ay:'Bu ay',tum:'Tüm zamanlar',ozel:'Seçili aralık'})[d.kapsam]||'';
   let html='';
-  // ÜST ÖZET KARTLARI
+
+  // ── ÜST ÖZET KARTLARI (ikonlu, modern) ──
   html+='<div class="perf-ozet">';
-  html+='<div class="perf-ozet-kart ana"><div class="poz-buyuk">'+(t.police||0)+'</div><div class="poz-etiket">Toplam Poliçe</div></div>';
-  html+='<div class="perf-ozet-kart"><div class="poz-buyuk">'+(t.kisi||0)+'</div><div class="poz-etiket">Çalışan Kişi</div></div>';
-  html+='<div class="perf-ozet-kart"><div class="poz-buyuk">'+(t.ikiAylik||0)+'</div><div class="poz-etiket">2 Aylık (işaretli)</div></div>';
-  html+='<div class="perf-ozet-kart"><div class="poz-buyuk">'+(t.kesim||0)+'</div><div class="poz-etiket">Kesim Mesajı</div></div>';
+  html+='<div class="perf-ozet-kart ana"><div class="poz-ikon">📄</div><div class="poz-buyuk">'+(t.police||0)+'</div><div class="poz-etiket">Toplam Poliçe</div></div>';
+  html+='<div class="perf-ozet-kart"><div class="poz-ikon">👥</div><div class="poz-buyuk">'+(t.kisi||0)+'</div><div class="poz-etiket">Çalışan Kişi</div></div>';
+  html+='<div class="perf-ozet-kart"><div class="poz-ikon">⏱️</div><div class="poz-buyuk">'+(t.ikiAylik||0)+'</div><div class="poz-etiket">2 Aylık</div></div>';
+  html+='<div class="perf-ozet-kart"><div class="poz-ikon">✂️</div><div class="poz-buyuk">'+(t.kesim||0)+'</div><div class="poz-etiket">Kesim Mesajı</div></div>';
   html+='</div>';
-  // AÇIKLAMA (kafa karışmasın)
-  html+='<div class="perf-aciklama">📄 <b>Poliçe</b> = panelden sürüklenip gruba yüklenen PDF\'ler. İletilen (forward) dosyalar ve "POS" içeren dosyalar <b>sayılmaz</b>. Branş dosya adından okunur; okunamazsa "Diğer" sayılır ama poliçe <b>yine sayılır</b>. <b>Kesim mesajı</b> = gruplara yazılan "kesiyorum/kesildi/ilgileniyorum" gibi mesajlar (yan bilgi). Dönem: <b>'+esc(kapsamAd)+'</b>.</div>';
-  // KİŞİ SIRALAMASI
+
   if(!liste.length){
-    html+='<div class="perf-bos">Bu dönemde poliçe yüklemesi yok.<br>Birisi gruba PDF sürükleyince burada görünecek.</div>';
-  } else {
-    html+='<div class="perf-baslik">🏆 Kişi Sıralaması (en çok poliçe yükleyen üstte)</div>';
-    liste.forEach((k,i)=>{
-      const sira=i+1;
-      const siraCls = sira===1?'birinci':(sira===2?'ikinci':(sira===3?'ucuncu':''));
-      // branş rozetleri (en çok 4 tanesini göster)
-      const branslar=Object.entries(k.branslar||{}).sort((a,b)=>b[1]-a[1]);
-      let rozetler='';
-      branslar.slice(0,4).forEach(([b,n])=>{ rozetler+='<span class="perf-rozet brans">'+bransGoster(b)+' '+n+'</span>'; });
-      if(branslar.length>4) rozetler+='<span class="perf-rozet">+'+(branslar.length-4)+' tür</span>';
-      if(k.ikiAylik>0) rozetler+='<span class="perf-rozet iki-aylik">2 aylık: '+k.ikiAylik+'</span>';
-      if(k.kesim>0) rozetler+='<span class="perf-rozet">✂️ '+k.kesim+' kesim</span>';
-      if(k.grupSayisi>0) rozetler+='<span class="perf-rozet">'+k.grupSayisi+' grup</span>';
-      html+='<div class="perf-kisi '+siraCls+'">'+
-        '<div class="perf-sira">'+sira+'</div>'+
-        '<div class="perf-kisi-orta">'+
-          '<div class="perf-kisi-ad">'+esc(k.ad)+'</div>'+
-          '<div class="perf-kisi-detay">'+rozetler+'</div>'+
-        '</div>'+
-        '<div class="perf-kisi-sayi"><div class="pks-buyuk">'+k.police+'</div><div class="pks-etiket">poliçe</div></div>'+
-      '</div>';
-    });
+    html+='<div class="perf-bos">📭<br>Bu dönemde poliçe yüklemesi yok.<br><span style="font-size:12.5px;opacity:.8">Birisi gruba PDF sürükleyince burada görünecek.</span></div>';
+    html+='<div class="perf-aciklama">📄 <b>Poliçe</b> = panelden sürüklenip gruba yüklenen PDF\'ler. İletilenler ve "POS" içerenler sayılmaz. <b>Kesim mesajı</b> = gruplara yazılan "kesiyorum/ilgileniyorum" gibi mesajlar.</div>';
+    alan.innerHTML=html; return;
   }
+
+  // en yüksek poliçe sayısı (barları oranlamak için)
+  const enYuksek = Math.max(...liste.map(k=>k.police), 1);
+  const birinci = liste[0];
+
+  // ── PANO BAŞLIĞI: lider vurgusu ──
+  if(birinci && birinci.police>0){
+    const ikinci = liste[1];
+    let fark='';
+    if(ikinci && ikinci.police>0){
+      const f=birinci.police-ikinci.police;
+      fark = f>0 ? ('<span class="lider-fark">2.\'den '+f+' poliçe önde</span>') : '<span class="lider-fark">başa baş yarış 🔥</span>';
+    }
+    html+='<div class="perf-lider">'+
+      '<div class="lider-kupa">🏆</div>'+
+      '<div class="lider-bilgi"><div class="lider-etiket">Dönemin lideri · '+esc(kapsamAd)+'</div>'+
+      '<div class="lider-ad">'+esc(birinci.ad)+'</div>'+fark+'</div>'+
+      '<div class="lider-sayi">'+birinci.police+'<small>poliçe</small></div>'+
+    '</div>';
+  }
+
+  // ── KİŞİ SIRALAMASI (görsel barlı, tıklanınca detay) ──
+  html+='<div class="perf-baslik">Sıralama <span style="font-weight:500;text-transform:none;letter-spacing:0;opacity:.7">· kişiye tıkla, detayını gör</span></div>';
+  html+='<div class="perf-liste">';
+  liste.forEach((k,i)=>{
+    const sira=i+1;
+    const siraCls = sira===1?'birinci':(sira===2?'ikinci':(sira===3?'ucuncu':''));
+    const madalya = sira===1?'🥇':(sira===2?'🥈':(sira===3?'🥉':sira));
+    const oran = Math.round((k.police/enYuksek)*100);
+    // mini rozetler (branş özeti, 2 aylık, kesim)
+    const branslar=Object.entries(k.branslar||{}).sort((a,b)=>b[1]-a[1]);
+    let miniRozet='';
+    branslar.slice(0,3).forEach(([b,n])=>{ miniRozet+='<span class="perf-rozet brans">'+bransGoster(b)+' '+n+'</span>'; });
+    if(branslar.length>3) miniRozet+='<span class="perf-rozet">+'+(branslar.length-3)+'</span>';
+    if(k.ikiAylik>0) miniRozet+='<span class="perf-rozet iki-aylik">⏱️ '+k.ikiAylik+'</span>';
+    if(k.kesim>0) miniRozet+='<span class="perf-rozet">✂️ '+k.kesim+'</span>';
+
+    html+='<div class="perf-kisi '+siraCls+'" onclick="perfDetayAc('+i+')" id="perfKisi'+i+'">'+
+      '<div class="perf-sira">'+madalya+'</div>'+
+      '<div class="perf-kisi-orta">'+
+        '<div class="perf-kisi-ust"><span class="perf-kisi-ad">'+esc(k.ad)+'</span><span class="perf-kisi-grup">'+k.grupSayisi+' grup</span></div>'+
+        '<div class="perf-bar-dis"><div class="perf-bar-ic" style="width:'+oran+'%"></div></div>'+
+        '<div class="perf-kisi-detay">'+miniRozet+'</div>'+
+      '</div>'+
+      '<div class="perf-kisi-sayi"><div class="pks-buyuk">'+k.police+'</div><div class="pks-etiket">poliçe</div><div class="pks-ok">▾</div></div>'+
+    '</div>'+
+    // DETAY (gizli, tıklayınca açılır)
+    '<div class="perf-detay" id="perfDetay'+i+'"></div>';
+  });
+  html+='</div>';
+
+  // açıklama en altta, sade
+  html+='<div class="perf-aciklama">📄 <b>Poliçe</b> = panelden sürüklenip yüklenen PDF\'ler (iletilenler ve "POS" hariç). Branş dosya adından okunur. <b>Kesim/ilgilenme</b> = gruplara yazılan mesajlar (yan bilgi).</div>';
+
   alan.innerHTML=html;
+}
+
+// Kişi detayını aç/kapat (akordeon)
+let _perfListe=[], _perfAcik=null;
+function perfDetayAc(i){
+  const det=document.getElementById('perfDetay'+i);
+  const kart=document.getElementById('perfKisi'+i);
+  if(!det||!_perfListe[i]) return;
+  // açıksa kapat
+  if(_perfAcik===i){
+    det.classList.remove('acik'); det.innerHTML='';
+    if(kart) kart.classList.remove('secili');
+    _perfAcik=null; return;
+  }
+  // başka açık varsa kapat
+  if(_perfAcik!==null){
+    const eski=document.getElementById('perfDetay'+_perfAcik);
+    const eskiKart=document.getElementById('perfKisi'+_perfAcik);
+    if(eski){ eski.classList.remove('acik'); eski.innerHTML=''; }
+    if(eskiKart) eskiKart.classList.remove('secili');
+  }
+  const k=_perfListe[i];
+  let h='<div class="pd-ic">';
+  // özet satırı
+  h+='<div class="pd-ozet">'+
+    '<div class="pd-oz"><b>'+k.police+'</b><span>poliçe</span></div>'+
+    '<div class="pd-oz"><b>'+(k.grupSayisi||0)+'</b><span>grup</span></div>'+
+    '<div class="pd-oz"><b>'+(k.ikiAylik||0)+'</b><span>2 aylık</span></div>'+
+    '<div class="pd-oz"><b>'+(k.kesim||0)+'</b><span>kesim</span></div>'+
+    '<div class="pd-oz"><b>'+(k.ilgilenme||0)+'</b><span>ilgilenme</span></div>'+
+  '</div>';
+  // branş dağılımı (görsel mini barlar)
+  const branslar=Object.entries(k.branslar||{}).sort((a,b)=>b[1]-a[1]);
+  if(branslar.length){
+    const enB=Math.max(...branslar.map(x=>x[1]),1);
+    h+='<div class="pd-baslik">Branş dağılımı</div><div class="pd-brans-liste">';
+    branslar.forEach(([b,n])=>{
+      h+='<div class="pd-brans"><span class="pd-brans-ad">'+bransGoster(b)+'</span><div class="pd-brans-bar"><div class="pd-brans-dolu" style="width:'+Math.round(n/enB*100)+'%"></div></div><span class="pd-brans-sayi">'+n+'</span></div>';
+    });
+    h+='</div>';
+  }
+  // grup bazında döküm
+  if(k.gruplar && k.gruplar.length){
+    h+='<div class="pd-baslik">Hangi grupta ne yaptı</div><div class="pd-grup-liste">';
+    k.gruplar.forEach(g=>{
+      let detaylar=[];
+      if(g.police>0) detaylar.push('<span class="pd-grup-rozet ana">'+g.police+' poliçe</span>');
+      if(g.kesim>0) detaylar.push('<span class="pd-grup-rozet">✂️ '+g.kesim+'</span>');
+      if(g.ilgilenme>0) detaylar.push('<span class="pd-grup-rozet">👀 '+g.ilgilenme+'</span>');
+      h+='<div class="pd-grup"><span class="pd-grup-ad">'+esc(g.ad)+'</span><span class="pd-grup-sag">'+detaylar.join('')+'</span></div>';
+    });
+    h+='</div>';
+  }
+  h+='</div>';
+  det.innerHTML=h;
+  det.classList.add('acik');
+  if(kart) kart.classList.add('secili');
+  _perfAcik=i;
 }
 
 function kontrolKapsam(k){

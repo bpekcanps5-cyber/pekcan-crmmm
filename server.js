@@ -634,11 +634,20 @@ app.post('/api/performans', express.json(), async (req, res) => {
     const aktiviteler = await db.loadAktiviteler(ar?.bas ?? null, ar?.bit ?? null, hat);
 
     // KİŞİ BAZINDA TOPLA: kullanıcı adına göre grupla
-    const kisiler = {}; // ad -> { ad, police, branslar:{}, kesim, ilgilenme, iki_aylik, gruplar:Set }
+    const kisiler = {}; // ad -> { ad, police, branslar:{}, kesim, ilgilenme, iki_aylik, gruplar:Map, sonTs }
     function kisiAl(ad) {
       const k = (ad || 'Bilinmeyen').trim() || 'Bilinmeyen';
-      if (!kisiler[k]) kisiler[k] = { ad: k, police: 0, branslar: {}, kesim: 0, ilgilenme: 0, ikiAylik: 0, gruplar: new Set() };
+      if (!kisiler[k]) kisiler[k] = {
+        ad: k, police: 0, branslar: {}, kesim: 0, ilgilenme: 0, ikiAylik: 0,
+        gruplar: new Map(),   // grupAdi -> { police, kesim, ilgilenme, branslar:{} }
+        sonTs: 0,             // en son aktivite zamanı
+      };
       return kisiler[k];
+    }
+    function grupAl(k, ad) {
+      const g = (ad || 'Bilinmeyen grup').trim() || 'Bilinmeyen grup';
+      if (!k.gruplar.has(g)) k.gruplar.set(g, { ad: g, police: 0, kesim: 0, ilgilenme: 0, branslar: {} });
+      return k.gruplar.get(g);
     }
     for (const p of policeler) {
       const k = kisiAl(p.kullanici_ad);
@@ -646,18 +655,29 @@ app.post('/api/performans', express.json(), async (req, res) => {
       const b = p.brans || 'diğer';
       k.branslar[b] = (k.branslar[b] || 0) + 1;
       if (p.iki_aylik) k.ikiAylik++;
-      if (p.chat_jid) k.gruplar.add(p.chat_jid);
+      if (p.ts && p.ts > k.sonTs) k.sonTs = p.ts;
+      // grup bazında döküm
+      const g = grupAl(k, p.chat_name);
+      g.police++;
+      g.branslar[b] = (g.branslar[b] || 0) + 1;
     }
     for (const a of aktiviteler) {
       const k = kisiAl(a.kullanici_ad);
       if (a.tur === 'kesim') k.kesim++;
       else if (a.tur === 'ilgileniyorum') k.ilgilenme++;
+      if (a.ts && a.ts > k.sonTs) k.sonTs = a.ts;
+      const g = grupAl(k, a.chat_name);
+      if (a.tur === 'kesim') g.kesim++;
+      else if (a.tur === 'ilgileniyorum') g.ilgilenme++;
     }
-    // diziye çevir + grup sayısını sayıya çevir + poliçeye göre sırala (en çok üstte)
+    // diziye çevir + grupları diziye çevir (poliçeye göre sıralı) + kişiyi sırala
     const liste = Object.values(kisiler).map(k => ({
       ad: k.ad, police: k.police, branslar: k.branslar,
       kesim: k.kesim, ilgilenme: k.ilgilenme, ikiAylik: k.ikiAylik,
       grupSayisi: k.gruplar.size,
+      sonTs: k.sonTs,
+      // DETAY: grup bazında döküm (en çok poliçe olan grup üstte)
+      gruplar: Array.from(k.gruplar.values()).sort((a, b) => b.police - a.police || b.kesim - a.kesim),
     })).sort((a, b) => b.police - a.police || b.kesim - a.kesim);
 
     // GENEL TOPLAMLAR (üstteki özet kartları için)

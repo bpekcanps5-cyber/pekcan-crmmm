@@ -1447,7 +1447,7 @@
 </div>
 
 <div class="lightbox" id="lightbox">
-  <div class="lb-stage" id="lbStage"><img id="lightboxImg" src="" draggable="false"><div id="lightboxPdfWrap" style="display:none;flex-direction:column;width:92vw;height:88vh"><div style="display:flex;gap:10px;justify-content:center;padding:8px 0;flex-shrink:0"><a id="pdfYeniSekme" href="" target="_blank" style="background:var(--brand);color:#fff;padding:8px 16px;border-radius:9px;text-decoration:none;font-size:13px;font-weight:600">⛶ Yeni sekmede aç</a><a id="pdfIndir" href="" download style="background:rgba(255,255,255,.15);color:#fff;padding:8px 16px;border-radius:9px;text-decoration:none;font-size:13px;font-weight:600">⬇ İndir</a></div><iframe id="lightboxPdf" src="" style="flex:1;width:100%;border:none;border-radius:10px;background:#fff"></iframe></div></div>
+  <div class="lb-stage" id="lbStage"><img id="lightboxImg" src="" draggable="false"></div>
   <div class="lb-toolbar">
     <button id="lbZoomOut" title="Uzaklastir"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg></button>
     <button id="lbReset" title="Sifirla"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg></button>
@@ -3878,13 +3878,14 @@ function renderMessages(c, searchQ){
         ? '<span class="doc-thumb" style="background-image:url('+esc(m.thumb)+')"></span>'
         : '<span class="doc-icon" style="background:'+dcolor+'">'+docSvg()+'<span class="doc-ext">'+dlabel+'</span></span>';
       const dlUrl = esc(m.mediaUrl) + '?name=' + encodeURIComponent(fname);
+      const indirUrl = esc(m.mediaUrl) + '?name=' + encodeURIComponent(fname) + '&download=1';
       // Belgeye TIKLAYINCA: dosya inmisse ic icerigi yeni sekmede ac (PDF/resim icini gor),
       // inmemisse "henuz indirilmedi" uyari. Alt satirda ayri "indir" baglantisi.
       const acHandler = m.mediaUrl
         ? 'onclick="event.preventDefault();belgeOnizle(\''+esc(m.mediaUrl)+'\',\''+esc(ext)+'\',\''+esc(m.thumb||'')+'\',\''+esc(fname)+'\')"'
         : 'onclick="event.preventDefault();showToast(\'Belge henüz indirilmedi, birazdan tekrar deneyin.\')"';
       const altYazi = m.mediaUrl ? 'Görüntülemek için tıkla' : 'İndiriliyor…';
-      body='<a class="msg-doc'+(m.thumb?' has-thumb':'')+'" href="'+dlUrl+'" '+acHandler+' style="cursor:pointer">'+icon+'<span class="doc-info"><span class="dn">'+hlight(fname,searchQ)+'</span><span class="dm">'+altYazi+'</span>'+(m.mediaUrl?'<a class="doc-indir" href="'+dlUrl+'" download="'+esc(fname)+'" onclick="event.stopPropagation()" style="font-size:11.5px;color:var(--accent);text-decoration:none;display:inline-block;margin-top:2px">⬇ İndir</a>':'')+'</span></a>';
+      body='<a class="msg-doc'+(m.thumb?' has-thumb':'')+'" href="'+dlUrl+'" '+acHandler+' style="cursor:pointer">'+icon+'<span class="doc-info"><span class="dn">'+hlight(fname,searchQ)+'</span><span class="dm">'+altYazi+'</span>'+(m.mediaUrl?'<a class="doc-indir" href="'+indirUrl+'" download="'+esc(fname)+'" onclick="event.stopPropagation()" style="font-size:11.5px;color:var(--accent);text-decoration:none;display:inline-block;margin-top:2px">⬇ İndir</a>':'')+'</span></a>';
       // belgeye yazilan ACIKLAMA (caption) varsa dosyanin altinda goster
       if(m.caption){ body+='<div class="caption">'+hlight(m.caption,searchQ,m.mentions)+'</div>'; }
     } else if(m.kind==='contact'&&m.contact){
@@ -4714,46 +4715,24 @@ function openLightbox(url){ lbImg.src=url; lbScale=1;lbX=0;lbY=0;lbApply(); lb.c
 // BELGE ONIZLEME: PDF panel ICINDE lightbox'ta acilir (foto gibi, hizli ac-kapa).
 // Resim de lightbox'ta. Word/Excel tarayicida gosterilemez -> yeni sekmede acilir/iner.
 // fname: gercek dosya adi — PDF'i "farkli kaydet" ile indirince dogru isim gelsin diye.
+// BELGE ONIZLEME: PDF/resim yeni sekmede acilir (tarayicinin kendi goruntuleyicisi —
+// net, tam ekran, "farkli kaydet"/yazdir hepsi calisir). BASIT ve GUVENILIR yontem.
 function belgeOnizle(mediaUrl, ext, thumb, fname){
   ext=(ext||'').toLowerCase();
   const resimMi=['jpg','jpeg','png','webp','gif','bmp'].includes(ext);
   const pdfMi=ext==='pdf';
-  const img=document.getElementById('lightboxImg');
-  const pdf=document.getElementById('lightboxPdf');
-  if(pdfMi){
-    // PDF: iframe'de panel icinde goster. URL'e ?name=gercekisim ekle ki "farkli kaydet"
-    // yapinca dogru dosya adi gelsin. HTTP'de iframe acilmazsa ustteki butonlar calisir.
-    const src = mediaUrl + (fname ? ('?name='+encodeURIComponent(fname)) : '');
-    if(img) img.style.display='none';
-    const wrap=document.getElementById('lightboxPdfWrap');
-    if(wrap) wrap.style.display='flex';
-    if(pdf) pdf.src=src;
-    // ustteki butonlar: yeni sekme + indir (iframe HTTP'de bloklanirsa kullanici bunlari kullanir)
-    const ys=document.getElementById('pdfYeniSekme'); if(ys) ys.href=src;
-    const ind=document.getElementById('pdfIndir'); if(ind){ ind.href=src; if(fname) ind.setAttribute('download', fname); }
-    document.getElementById('lightbox').classList.add('show');
-  } else if(resimMi){
-    // Resim: normal lightbox (zoom'lu)
-    if(pdf){ pdf.src=''; }
-    const wrap=document.getElementById('lightboxPdfWrap'); if(wrap) wrap.style.display='none';
-    if(img) img.style.display='';
-    openLightbox(mediaUrl);
+  // gercek isimle ac: sunucu 'inline' Content-Disposition + dogru isim verir.
+  // Boylece PDF/resim yeni sekmede ACILIR ve "farkli kaydet" yapinca DOGRU isim gelir.
+  const src = mediaUrl + (fname ? ('?name='+encodeURIComponent(fname)) : '');
+  if(pdfMi || resimMi){
+    try{ window.open(src, '_blank'); }
+    catch(e){ if(thumb) openLightbox(thumb); }
   } else {
     // word/excel vs: tarayicida gosterilemez -> yeni sekmede ac (iner)
-    const src = mediaUrl + (fname ? ('?name='+encodeURIComponent(fname)) : '');
     try{ window.open(src, '_blank'); }catch(e){ if(thumb) openLightbox(thumb); }
   }
 }
-function lbClose(){
-  lb.classList.remove('show'); lbScale=1; lbX=0; lbY=0; lbApply();
-  // PDF iframe'ini temizle (kapaninca arka planda yuklu kalmasin) + img'i geri ac
-  const pdf=document.getElementById('lightboxPdf');
-  const img=document.getElementById('lightboxImg');
-  const wrap=document.getElementById('lightboxPdfWrap');
-  if(pdf){ pdf.src=''; }
-  if(wrap) wrap.style.display='none';
-  if(img) img.style.display='';
-}
+function lbClose(){ lb.classList.remove('show'); lbScale=1; lbX=0; lbY=0; lbApply(); }
 document.getElementById('lbClose').onclick=lbClose;
 document.getElementById('lbZoomIn').onclick=()=>{ lbScale=Math.min(5,lbScale+0.3); lbApply(); };
 document.getElementById('lbZoomOut').onclick=()=>{ lbScale=Math.max(1,lbScale-0.3); if(lbScale===1){lbX=0;lbY=0;} lbApply(); };

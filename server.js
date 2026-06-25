@@ -127,8 +127,11 @@ app.get('/media/:file', (req, res, next) => {
   const filePath = path.join(MEDIA_DIR, req.params.file);
   if (!fs.existsSync(filePath)) return next();
   if (wanted) {
-    // gercek isimle indir
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(wanted)}"`);
+    // 'inline': tarayicida GORUNTULE (indirme zorlamaz, "yasakli dosya" uyarisi vermez)
+    // ama "farkli kaydet" yapilinca da gercek dosya adi gelsin. download=true ise indir.
+    const indir = req.query.download === '1';
+    const disp = indir ? 'attachment' : 'inline';
+    res.setHeader('Content-Disposition', `${disp}; filename="${encodeURIComponent(wanted)}"`);
   }
   return res.sendFile(filePath);
 });

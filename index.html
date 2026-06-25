@@ -762,6 +762,8 @@
   .qr-list{overflow-y:auto;padding:6px}
   .qr-item{padding:10px 12px;border-radius:10px;cursor:pointer;transition:background .12s;display:flex;flex-direction:column;gap:2px;position:relative}
   .qr-item:hover{background:var(--brand-soft)}
+  /* klavyeyle (ok tuşu) seçili öğe — net vurgu + sol çizgi */
+  .qr-item.secili{background:var(--brand-soft);box-shadow:inset 3px 0 0 var(--brand)}
   .qr-item .qr-title{font-size:12px;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.3px;display:flex;align-items:center;gap:6px}
   .qr-item .qr-tag{background:var(--brand);color:#fff;font-size:9.5px;padding:1px 6px;border-radius:5px;letter-spacing:.5px}
   .qr-item .qr-text{font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85}
@@ -953,16 +955,19 @@
   .fwd-chip{display:inline-flex;align-items:center;gap:6px;background:var(--brand-soft);color:var(--brand);font-size:12.5px;font-weight:600;padding:5px 11px;border-radius:16px}
   .fwd-chip b{cursor:pointer;font-size:15px;line-height:1;font-weight:400}
   .fwd-chip b:hover{color:var(--text)}
-  /* SEÇİM DAİRESİ — WhatsApp gibi baloncuğun SOL DIKEY ORTASINDA, HER ZAMAN var.
-     Normalde soluk; mesajın üstüne gelince (hover) veya seçiliyken belirginleşir. */
-  .sec-kutu{position:absolute;left:-32px;top:50%;transform:translateY(-50%);display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;border:2px solid var(--border);cursor:pointer;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;transition:all .12s;background:var(--panel);z-index:2;opacity:.35}
-  .sec-kutu:hover{opacity:1;border-color:var(--brand);transform:translateY(-50%) scale(1.1)}
-  .msg:hover .sec-kutu{opacity:.85}
-  .sec-kutu.dolu{background:var(--brand);border-color:var(--brand);opacity:1}
-  /* Her mesaja sol boşluk ver ki daire için yer olsun (baloncuk daireyle çakışmasın) */
-  .msg.secim-acik{margin-left:34px}
-  /* giden mesajlar zaten sağda; onlarda da daire solda durur ama sağ kenara yapışmasın */
-  .msg.out.secim-acik{margin-left:34px;margin-right:4px}
+  /* SEÇİM DAİRESİ — normalde GİZLİ (gözü yormasın). Sadece:
+     1) mesajın üstüne gelince (hover) görünür,
+     2) zaten bir seçim varsa (secim-modu) hepsi görünür. */
+  .sec-kutu{position:absolute;left:-32px;top:50%;transform:translateY(-50%);display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;border:2px solid var(--border);cursor:pointer;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;transition:opacity .14s, border-color .12s, background .12s;background:var(--panel);z-index:2;opacity:0;pointer-events:none}
+  /* mesaja gelince daire belirir ve tıklanabilir olur */
+  .msg:hover .sec-kutu{opacity:.7;pointer-events:auto}
+  .sec-kutu:hover{opacity:1 !important;border-color:var(--brand);transform:translateY(-50%) scale(1.12)}
+  /* seçim modunda (en az 1 seçili) TÜM daireler görünür ve tıklanabilir */
+  .msg.secim-modu .sec-kutu{opacity:.85;pointer-events:auto}
+  .sec-kutu.dolu{background:var(--brand);border-color:var(--brand);opacity:1 !important;pointer-events:auto}
+  /* Sol boşluğu SADECE seçim modunda ver (normalde mesajlar tam yerinde dursun) */
+  .msg.secim-modu{margin-left:34px}
+  .msg.out.secim-modu{margin-left:34px;margin-right:4px}
   /* Toast bildirim */
   #toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:13px 22px;border-radius:13px;font-size:13.5px;font-weight:600;box-shadow:var(--shadow-lg);z-index:300;opacity:0;transition:all .3s cubic-bezier(.2,.8,.2,1);pointer-events:none;display:flex;align-items:center;gap:9px}
   #toast.show{transform:translateX(-50%) translateY(0);opacity:1}
@@ -3121,10 +3126,15 @@ function applyUser(){
   // "Izinli IP'ler" menusu sadece yoneticide gorunur
   const ipm=document.getElementById('ipMgmtItem');
   if(ipm) ipm.style.display = currentUser.role==='admin' ? 'flex' : 'none';
-  // "WhatsApp cikis / Numara degistir" SADECE yoneticide gorunur.
-  // (Normal kullanici WhatsApp baglantisini kesemez/numara degistiremez — ofis ortak hatti korunur.)
+  // "WhatsApp cikis / Numara degistir":
+  //  - YÖNETİCİ: görür (ofis ortak hattını yönetir).
+  //  - PAZARLAMACI: görür (KENDİ hattını kullanır, kendi WhatsApp'ından çıkabilmeli).
+  //  - Ofis TEMSİLCİSİ: GÖRMEZ (ortak hattı kesemez, korunur).
   const wac=document.getElementById('waCikisItem');
-  if(wac) wac.style.display = currentUser.role==='admin' ? 'flex' : 'none';
+  if(wac){
+    const waCikabilir = (currentUser.role==='admin') || (currentUser.lineTip==='pazarlama');
+    wac.style.display = waCikabilir ? 'flex' : 'none';
+  }
   // "Tehlikeli islemler" (grup sifirlama) SADECE yoneticide gorunur.
   const tb=document.getElementById('tehlikeliBolge');
   if(tb) tb.style.display = currentUser.role==='admin' ? 'block' : 'none';
@@ -4548,7 +4558,7 @@ function renderMessages(c, searchQ){
     // tıklayınca seçilir/bırakılır; mesajın kendisine tıklamak seçim YAPMAZ.
     const secimModu = selectedMsgs.size>0;
     const secKutu = '<span class="sec-kutu'+(selectedMsgs.has(m.id)?' dolu':'')+'" onclick="event.stopPropagation();secimToggle(\''+esc(m.id||'')+'\')" title="Seç">'+(selectedMsgs.has(m.id)?'✓':'')+'</span>';
-    return sep+'<div class="msg '+cls+grpCls+selCls+menCls+failCls+' secim-acik'+(secimModu?' secim-modu':'')+'" data-mid="'+esc(m.id||'')+'">'+secKutu+actions+name+fwd+quote+body+reaction+'<span class="meta">'+editedTag+esc(m.time||'')+tik+'</span></div>';
+    return sep+'<div class="msg '+cls+grpCls+selCls+menCls+failCls+(secimModu?' secim-modu':'')+'" data-mid="'+esc(m.id||'')+'">'+secKutu+actions+name+fwd+quote+body+reaction+'<span class="meta">'+editedTag+esc(m.time||'')+tik+'</span></div>';
   }).join('');
   // Render ONCESI: kullanici en altta miydi? (tazeleme sirasinda yukarida okuyorsa
   // ekrani zorla asagi atmayalim — sadece zaten en alttaysa takip et.)
@@ -5678,6 +5688,8 @@ async function qrFetch(){
   qrRender();
 }
 
+let _qrSecili=-1;        // klavyeyle seçili öğenin indeksi (-1 = yok)
+let _qrGosterilen=[];    // o an listede görünen öğeler (ok tuşları için)
 function qrRender(filtre=''){
   const list=document.getElementById('qrList');
   const bos=document.getElementById('qrEmpty');
@@ -5685,6 +5697,9 @@ function qrRender(filtre=''){
   const gosterilecek = _qrItems.filter(x =>
     !f || (x.title||'').toLocaleLowerCase('tr').includes(f) || (x.text||'').toLocaleLowerCase('tr').includes(f)
   );
+  _qrGosterilen = gosterilecek;
+  // filtre değişince seçimi başa al (sonuç varsa ilkini seç ki Enter direkt çalışsın)
+  _qrSecili = gosterilecek.length ? 0 : -1;
   if(gosterilecek.length===0){
     list.innerHTML='';
     bos.style.display='block';
@@ -5692,12 +5707,27 @@ function qrRender(filtre=''){
     return;
   }
   bos.style.display='none';
-  list.innerHTML = gosterilecek.map(x=>(
-    '<div class="qr-item" onclick="qrUse(\''+x.id+'\')">'
+  list.innerHTML = gosterilecek.map((x,i)=>(
+    '<div class="qr-item'+(i===_qrSecili?' secili':'')+'" data-qri="'+i+'" onclick="qrUse(\''+x.id+'\')">'
     + '<div class="qr-title"><span class="qr-tag">EKİP</span>'+esc(x.title)+'</div>'
     + '<div class="qr-text">'+esc(x.text)+'</div>'
     + '</div>'
   )).join('');
+}
+
+// Klavye seçimini güncelle (vurgu + görünür alana kaydır)
+function qrSeciliGuncelle(yeni){
+  if(!_qrGosterilen.length) return;
+  // sınırların içinde tut (döngüsel: sondan sonra başa, baştan önce sona)
+  if(yeni<0) yeni=_qrGosterilen.length-1;
+  if(yeni>=_qrGosterilen.length) yeni=0;
+  _qrSecili=yeni;
+  const list=document.getElementById('qrList');
+  list.querySelectorAll('.qr-item').forEach(el=>{
+    const i=parseInt(el.getAttribute('data-qri'),10);
+    el.classList.toggle('secili', i===_qrSecili);
+    if(i===_qrSecili) el.scrollIntoView({block:'nearest'});
+  });
 }
 
 // Hizli yanit sec -> mesaj kutusuna koy (gondermez, kullanici kontrol edip gonderir)
@@ -5731,6 +5761,33 @@ function qrToggle(){
   const acik=document.getElementById('qrPanel').classList.contains('show');
   if(acik) qrClose(); else qrOpen();
 }
+
+// ── ALT tuşu KISAYOLU: hızlı mesaj kutusunu aç/kapat ──
+// Sadece mesaj kutusu BOŞKEN ve ALT başka tuşla kombinlenmediyse çalışır.
+// (Alt+Tab, Alt+harf gibi sistem/menü kısayollarıyla karışmaz.)
+let _altTemiz=false;
+document.addEventListener('keydown',e=>{
+  if(e.key==='Alt' && !e.repeat){
+    _altTemiz=true;   // ALT'a basıldı, henüz temiz
+  } else {
+    _altTemiz=false;  // başka bir tuş basıldı -> ALT artık "tek başına" değil
+  }
+});
+document.addEventListener('keyup',e=>{
+  if(e.key!=='Alt') return;
+  if(!_altTemiz) return;     // araya başka tuş girmişse iptal
+  _altTemiz=false;
+  // sohbet açık değilse anlamsız
+  if(!activeJid) return;
+  // mesaj kutusu: sadece BOŞSA çalış (yazı varken karışmasın)
+  const inp=document.getElementById('msgInput');
+  if(inp && inp.value.trim()) return;
+  // başka bir input/modal aktifse karışma (hızlı mesaj arama kutusu hariç)
+  const aktif=document.activeElement;
+  if(aktif && (aktif.tagName==='INPUT'||aktif.tagName==='TEXTAREA') && aktif.id!=='msgInput' && aktif.id!=='qrSearch') return;
+  e.preventDefault();
+  qrToggle();
+});
 
 // ---- Hizli yanit YONETIMI (modal — prompt/confirm yerine duzgun arayuz) ----
 let _qrEditId = null; // null = ekleme modu, dolu = duzenleme modu
@@ -5822,6 +5879,17 @@ async function qrDoDelete(id){
 document.getElementById('qrBtn').onclick=(e)=>{ e.stopPropagation(); qrToggle(); };
 document.getElementById('qrManageBtn').onclick=qrMgmtOpen;
 document.getElementById('qrSearch').addEventListener('input',e=>qrRender(e.target.value));
+// HIZLI MESAJ klavye kontrolü: ↓/↑ ile gez, Enter ile seçili olanı kutuya yaz, Esc kapat.
+document.getElementById('qrSearch').addEventListener('keydown',e=>{
+  if(e.key==='ArrowDown'){ e.preventDefault(); qrSeciliGuncelle(_qrSecili+1); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); qrSeciliGuncelle(_qrSecili-1); }
+  else if(e.key==='Enter'){
+    e.preventDefault();
+    // seçili olan varsa onu kutuya yaz (qrUse) — sonra kullanıcı tekrar Enter ile gönderir
+    if(_qrSecili>=0 && _qrGosterilen[_qrSecili]) qrUse(_qrGosterilen[_qrSecili].id);
+  }
+  else if(e.key==='Escape'){ e.preventDefault(); qrClose(); }
+});
 document.getElementById('qrSaveBtn').onclick=qrSave;
 document.getElementById('qrCancelEditBtn').onclick=()=>{ _qrEditId=null; qrFormReset(); };
 document.getElementById('qrMgmtClose').onclick=qrMgmtClose;

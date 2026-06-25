@@ -3881,7 +3881,7 @@ function renderMessages(c, searchQ){
       // Belgeye TIKLAYINCA: dosya inmisse ic icerigi yeni sekmede ac (PDF/resim icini gor),
       // inmemisse "henuz indirilmedi" uyari. Alt satirda ayri "indir" baglantisi.
       const acHandler = m.mediaUrl
-        ? 'onclick="event.preventDefault();belgeOnizle(\''+esc(m.mediaUrl)+'\',\''+esc(ext)+'\',\''+esc(m.thumb||'')+'\')"'
+        ? 'onclick="event.preventDefault();belgeOnizle(\''+esc(m.mediaUrl)+'\',\''+esc(ext)+'\',\''+esc(m.thumb||'')+'\',\''+esc(fname)+'\')"'
         : 'onclick="event.preventDefault();showToast(\'Belge henüz indirilmedi, birazdan tekrar deneyin.\')"';
       const altYazi = m.mediaUrl ? 'Görüntülemek için tıkla' : 'İndiriliyor…';
       body='<a class="msg-doc'+(m.thumb?' has-thumb':'')+'" href="'+dlUrl+'" '+acHandler+' style="cursor:pointer">'+icon+'<span class="doc-info"><span class="dn">'+hlight(fname,searchQ)+'</span><span class="dm">'+altYazi+'</span>'+(m.mediaUrl?'<a class="doc-indir" href="'+dlUrl+'" download="'+esc(fname)+'" onclick="event.stopPropagation()" style="font-size:11.5px;color:var(--accent);text-decoration:none;display:inline-block;margin-top:2px">⬇ İndir</a>':'')+'</span></a>';
@@ -4713,16 +4713,19 @@ function lbApply(){ lbImg.style.transform='translate('+lbX+'px,'+lbY+'px) scale(
 function openLightbox(url){ lbImg.src=url; lbScale=1;lbX=0;lbY=0;lbApply(); lb.classList.add('show'); }
 // BELGE ONIZLEME: PDF panel ICINDE lightbox'ta acilir (foto gibi, hizli ac-kapa).
 // Resim de lightbox'ta. Word/Excel tarayicida gosterilemez -> yeni sekmede acilir/iner.
-function belgeOnizle(mediaUrl, ext, thumb){
+// fname: gercek dosya adi — PDF'i "farkli kaydet" ile indirince dogru isim gelsin diye.
+function belgeOnizle(mediaUrl, ext, thumb, fname){
   ext=(ext||'').toLowerCase();
   const resimMi=['jpg','jpeg','png','webp','gif','bmp'].includes(ext);
   const pdfMi=ext==='pdf';
   const img=document.getElementById('lightboxImg');
   const pdf=document.getElementById('lightboxPdf');
   if(pdfMi){
-    // PDF: iframe'de panel icinde goster (foto gibi acilir, X veya ESC ile kapanir)
+    // PDF: iframe'de panel icinde goster. URL'e ?name=gercekisim ekle ki "farkli kaydet"
+    // yapinca dogru dosya adi gelsin (sunucu Content-Disposition'a bu ismi koyar).
+    const src = mediaUrl + (fname ? ('?name='+encodeURIComponent(fname)) : '');
     if(img) img.style.display='none';
-    if(pdf){ pdf.src=mediaUrl; pdf.style.display='block'; }
+    if(pdf){ pdf.src=src; pdf.style.display='block'; }
     document.getElementById('lightbox').classList.add('show');
   } else if(resimMi){
     // Resim: normal lightbox (zoom'lu)
@@ -4731,7 +4734,8 @@ function belgeOnizle(mediaUrl, ext, thumb){
     openLightbox(mediaUrl);
   } else {
     // word/excel vs: tarayicida gosterilemez -> yeni sekmede ac (iner)
-    try{ window.open(mediaUrl, '_blank'); }catch(e){ if(thumb) openLightbox(thumb); }
+    const src = mediaUrl + (fname ? ('?name='+encodeURIComponent(fname)) : '');
+    try{ window.open(src, '_blank'); }catch(e){ if(thumb) openLightbox(thumb); }
   }
 }
 function lbClose(){
@@ -4947,12 +4951,18 @@ async function doSendFiles(){
   // gonderim hep bu sabit 'hedefJid'e yapilir, yukleme bitene kadar degismez.
   const hedefJid = activeJid;
   const hedefAd = (chats[hedefJid] && chats[hedefJid].name) ? chats[hedefJid].name : '';
+  // YANIT (reply): bir mesaji yanitlayip dosya gonderiliyorsa, dosya o mesaja YANIT
+  // olarak gitsin. Eskiden dosya gonderince yanit bilgisi kayboluyordu (duz gidiyordu).
+  // Yaniti basta sabitle + ilk dosyaya uygula, sonra yanit kutusunu temizle.
+  const yanitId = (replyTarget && replyTarget.id) ? replyTarget.id : null;
+  clearReply(); // yanit kutusunu kapat (dosya gonderildikten sonra durmamali)
   for(let i=0;i<files.length;i++){
     const file=files[i];
     // aciklama sadece ilk dosyaya eklensin (WhatsApp da boyle yapar)
     const q=new URLSearchParams({jid:hedefJid, name:file.name, mime:file.type||'application/octet-stream', agent:benimAdim()});
     if(authToken) q.set('token', authToken);
     if(caption && i===0) q.set('caption', caption);
+    if(yanitId && i===0) q.set('replyId', yanitId); // yanit SADECE ilk dosyaya
     const boyutMB=(file.size/1048576).toFixed(1);
     showToast('📎 '+file.name+(hedefAd?(' → '+hedefAd):'')+' gönderiliyor… ('+boyutMB+' MB)');
     try{

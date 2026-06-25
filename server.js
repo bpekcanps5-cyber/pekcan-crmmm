@@ -742,7 +742,19 @@ app.post('/upload', express.raw({ type: '*/*', limit: '64mb' }), async (req, res
     // 90sn icinde yuklenmezse hata don (kullanici tekrar denesin).
     let sent;
     try {
-      const gonderP = upSock.sendMessage(jid, waMsg);
+      // YANIT (reply): panel replyId gonderdiyse, o mesaji bulup dosyayi ona YANIT olarak gonder.
+      // Yanitlanan mesajin 'raw'ini bellekteki sohbetten buluruz (quoted icin gerekli).
+      let gonderOpt = {};
+      const replyId = req.query.replyId;
+      if (replyId) {
+        try {
+          const C2 = hatChats(upLineId);
+          const chat2 = C2 && C2.get ? C2.get(jid) : null;
+          const orijMsg = chat2 && chat2.messages ? chat2.messages.find(x => x && x.id === replyId) : null;
+          if (orijMsg && orijMsg.raw) gonderOpt = { quoted: orijMsg.raw };
+        } catch (e) { /* yanit bulunamazsa normal gonder */ }
+      }
+      const gonderP = upSock.sendMessage(jid, waMsg, gonderOpt);
       const timeoutP = new Promise((_, rej) => setTimeout(() => rej(new Error('dosya yukleme zaman asimi (cok buyuk olabilir)')), 90000));
       sent = await Promise.race([gonderP, timeoutP]);
     } catch (gonderHata) {

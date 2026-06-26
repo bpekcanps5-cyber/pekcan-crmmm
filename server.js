@@ -861,9 +861,9 @@ app.post('/upload', express.raw({ type: '*/*', limit: '64mb' }), async (req, res
     // 90sn icinde yuklenmezse hata don (kullanici tekrar denesin).
     let sent;
     try {
-      // YANIT (reply): panel replyId gonderdiyse, o mesaji bulup dosyayi ona YANIT olarak gonder.
-      // Yanitlanan mesajin 'raw'ini bellekteki sohbetten buluruz (quoted icin gerekli).
-      // raw YOKSA (DB'den yuklenen eski mesaj) key'den quoted INSA EDERIZ — tıpkı metin yanıtı gibi.
+      // YANIT (reply): panel replyId gonderdiyse, dosyayi o mesaja YANIT olarak gonder.
+      // GUVENLI: sadece TAM raw (key'li) varsa quoted ekleriz. raw yoksa alintisiz gondeririz
+      // (alinti insa etmeye calismak bazi mesajlarda gonderim hatasina yol aciyordu).
       let gonderOpt = {};
       const replyId = req.query.replyId;
       if (replyId) {
@@ -871,23 +871,20 @@ app.post('/upload', express.raw({ type: '*/*', limit: '64mb' }), async (req, res
           const C2 = hatChats(upLineId);
           const chat2 = C2 && C2.get ? C2.get(jid) : null;
           const orijMsg = chat2 && chat2.messages ? chat2.messages.find(x => x && x.id === replyId) : null;
-          if (orijMsg) {
-            if (orijMsg.raw && orijMsg.raw.key) {
-              gonderOpt = { quoted: orijMsg.raw };               // tam raw var (en iyi)
-              console.log('   ↩️  medya yaniti: tam raw ile alinti hazir');
-            } else {
-              const quotedMsg = insaQuotedMesaj(orijMsg);        // raw yok -> key'den insa et
-              if (quotedMsg) {
-                gonderOpt = { quoted: quotedMsg };
-                console.log('   ↩️  medya yaniti: key’den alinti insa edildi');
-              } else {
-                console.log('   ⚠️  medya yaniti: alinti insa edilemedi -> alintisiz gonderiliyor');
-              }
-            }
+          if (orijMsg && orijMsg.raw && orijMsg.raw.key && orijMsg.raw.message) {
+            gonderOpt = { quoted: orijMsg.raw };
+            console.log('   ↩️  medya yaniti: raw ile alinti hazir');
           }
         } catch (e) { /* yanit bulunamazsa normal gonder */ }
       }
-      const gonderP = upSock.sendMessage(jid, waMsg, gonderOpt);
+      let gonderP;
+      try {
+        gonderP = upSock.sendMessage(jid, waMsg, gonderOpt);
+      } catch (qErr) {
+        // quoted ile gonderim ANINDA patlarsa (bozuk quoted): alintisiz tekrar dene
+        console.log('   ⚠️  alintili gonderim hata verdi, alintisiz deneniyor:', qErr.message);
+        gonderP = upSock.sendMessage(jid, waMsg, {});
+      }
       const timeoutP = new Promise((_, rej) => setTimeout(() => rej(new Error('dosya yukleme zaman asimi (cok buyuk olabilir)')), 90000));
       sent = await Promise.race([gonderP, timeoutP]);
     } catch (gonderHata) {
@@ -900,16 +897,21 @@ app.post('/upload', express.raw({ type: '*/*', limit: '64mb' }), async (req, res
     }
     console.log(`✅ Dosya gonderildi: ${fileName} (${boyutMB} MB)`);
 
-    // YANIT önizlemesi: medya bir mesaja yanıt olarak gittiyse, panelde de "yanıt: ..." görünsün.
+    // YANIT önizlemesi (panelde "yanıt: ..." görünsün) — GUVENLI: hata olsa bile PDF düşmeli.
     let medyaReplyTo = null;
-    if (replyId) {
-      try {
+    try {
+      const replyId2 = req.query.replyId;
+      if (replyId2) {
         const C3 = hatChats(upLineId);
         const chat3 = C3 && C3.get ? C3.get(jid) : null;
-        const orij = chat3 && chat3.messages ? chat3.messages.find(x => x && x.id === replyId) : null;
-        if (orij) medyaReplyTo = { sender: orij.fromMe ? 'Siz' : (orij.sender || ''), text: replyPreview(orij) };
-      } catch (e) {}
-    }
+        const orij = chat3 && chat3.messages ? chat3.messages.find(x => x && x.id === replyId2) : null;
+        if (orij) {
+          let onText = '';
+          try { onText = replyPreview(orij); } catch (e) { onText = orij.text || ''; }
+          medyaReplyTo = { sender: orij.fromMe ? 'Siz' : (orij.sender || ''), text: onText };
+        }
+      }
+    } catch (e) { medyaReplyTo = null; }
 
     addMessage(jid, {
       id: sent.key.id, key: sent.key,
@@ -920,7 +922,7 @@ app.post('/upload', express.raw({ type: '*/*', limit: '64mb' }), async (req, res
       fileName: kind === 'document' ? fileName : undefined,
       mime: mime,
       mediaUrl: webPath, sender: agent, time: nowTime(),
-      replyTo: medyaReplyTo, // panelde yanıt önizlemesi
+      replyTo: medyaReplyTo, // panelde yanıt önizlemesi (null olabilir, sorun değil)
       durum: 2, // gonderildi (tek tik)
     }, {}, upLineId);
 
@@ -2085,9 +2087,9 @@ wss.on('connection', (ws) => {
         const kelime = (msg.q || '').trim();
         if (kelime.length >= 2 && db.isReady()) {
           const sonuc = await db.searchMessages(kelime, _LID, 40);
-          ws.send(JSON.stringify({ type: 'searchMessagesResult', q: kelime, sonuclar: sonuc }));
+          ws.send(JSON.stringify({ type: 'searchMessagesResult', q: kelime, sohbetler: sonuc.sohbetler, mesajlar: sonuc.mesajlar }));
         } else {
-          ws.send(JSON.stringify({ type: 'searchMessagesResult', q: kelime, sonuclar: [] }));
+          ws.send(JSON.stringify({ type: 'searchMessagesResult', q: kelime, sohbetler: [], mesajlar: [] }));
         }
       }
       // beforeTs'ten ESKI mesajlari DB'den cekip panele AYRI gonderir (ustetune eklenir).

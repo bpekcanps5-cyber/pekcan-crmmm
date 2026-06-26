@@ -446,6 +446,14 @@
   .internal-newbtn svg{width:18px;height:18px}
   #internalMessages{flex:1;overflow-y:auto;min-height:0;padding:18px 22px;display:flex;flex-direction:column;gap:7px}
   .im-msg{max-width:65%;padding:8px 13px;border-radius:14px;font-size:14px;line-height:1.4;word-wrap:break-word}
+  /* iç mesaj dosya/resim */
+  .im-img{max-width:240px;max-height:280px;border-radius:10px;display:block;cursor:pointer;margin:2px 0}
+  .im-caption{margin-top:5px;font-size:13.5px}
+  .im-dosya{display:flex;align-items:center;gap:9px;padding:9px 12px;background:rgba(0,0,0,.12);border-radius:10px;text-decoration:none;color:inherit;min-width:180px}
+  .im-msg.out .im-dosya{background:rgba(255,255,255,.15)}
+  .im-dosya-ik{font-size:24px;flex-shrink:0}
+  .im-dosya-ad{flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .im-dosya-in{font-size:11px;opacity:.8;flex-shrink:0}
   .im-msg.out{align-self:flex-end;background:linear-gradient(140deg,#14b8a6,#0f766e);color:#fff;border-bottom-right-radius:4px}
   .im-msg.in{align-self:flex-start;background:var(--panel-2);color:var(--text);border-bottom-left-radius:4px}
   .im-msg .im-time{font-size:10px;opacity:.7;margin-top:3px;text-align:right}
@@ -545,6 +553,8 @@
   .alta-in-btn{position:absolute;right:18px;bottom:90px;z-index:6;width:42px;height:42px;border-radius:50%;border:1px solid var(--border-soft);background:var(--panel);color:var(--muted);cursor:pointer;display:grid;place-items:center;box-shadow:var(--shadow-md);transition:all .15s;opacity:.92}
   .alta-in-btn:hover{background:var(--brand);color:#fff;border-color:var(--brand);transform:translateY(-2px);opacity:1}
   .alta-in-btn svg{width:24px;height:24px}
+  /* yeni mesaj bildirim rozeti (alta in butonunun üstünde) */
+  .alta-in-badge{position:absolute;top:-6px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:11px;background:var(--brand);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;box-shadow:0 2px 6px rgba(0,0,0,.3);border:2px solid var(--chat-bg)}
   .messages>*:first-child{margin-top:auto}
   .messages::-webkit-scrollbar{width:8px}
   .messages::-webkit-scrollbar-thumb{background:rgba(120,140,138,.3);border-radius:5px}
@@ -1247,6 +1257,7 @@
       <div class="eski-yuk-not" id="eskiYukNot" style="display:none">⏳ Daha eski mesajlar yükleniyor…</div>
       <button class="alta-in-btn" id="altaInBtn" onclick="enAltaIn()" title="En alta in" style="display:none">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+        <span class="alta-in-badge" id="altaInBadge" style="display:none">0</span>
       </button>
       <div class="messages" id="messages"></div>
       <div class="mention-list" id="mentionList"></div>
@@ -1322,6 +1333,8 @@
       </div>
       <div class="messages" id="internalMessages"></div>
       <div class="composer">
+        <button class="attach-btn" id="internalAttachBtn" title="Dosya ekle"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg></button>
+        <input type="file" id="internalFileInput" style="display:none" multiple>
         <textarea id="internalInput" placeholder="Ekip arkadaşına mesaj yaz" rows="1"></textarea>
         <button class="send-btn" id="internalSendBtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>
       </div>
@@ -1982,6 +1995,7 @@ let chats={};
 let activeJid=null, currentFilter='all', searchTerm='', connected=false, hasConnectedOnce=false;
 // Sonsuz scroll durumu (yukarı kaydırınca eski mesaj yükleme)
 let _eskiYukleniyor=false;     // şu an "daha eski getir" isteği gönderildi mi (çift istek olmasın)
+let _altaInBildirim=0, _altaInSonSayi=null; // alta in butonu yeni mesaj bildirimi
 let _eskiBitti={};             // jid -> true: bu sohbette daha eski mesaj kalmadı
 let _team=[]; // ekip uyeleri {username, displayName} — atama modalinda + openChat'te kullanilir
 let replyTarget=null;
@@ -3069,7 +3083,7 @@ function renderInternalList(d){
     return '<div class="chat'+aktif+'" onclick="openInternalChat(\''+esc(it.other_user)+'\')">'
       + '<div class="avatar" style="background:linear-gradient(140deg,#6366f1,#4f46e5)">'+esc(initials(ad))+'</div>'
       + '<div class="chat-main"><div class="chat-top"><span class="chat-name">'+esc(ad)+'</span></div>'
-      + '<div class="chat-bottom"><span class="chat-last">'+esc(sonKim)+esc((it.last_text||'').slice(0,40))+'</span>'+rozet+'</div></div>'
+      + '<div class="chat-bottom"><span class="chat-last">'+esc(sonKim)+esc(((it.last_text||'').trim()||'📎 Dosya').slice(0,40))+'</span>'+rozet+'</div></div>'
       + '</div>';
   }).join('');
 }
@@ -3105,7 +3119,27 @@ function drawInternalMessages(){
     const gun = ts?new Date(ts).toLocaleDateString('tr-TR'):'';
     if(gun && gun!==sonGun){ html+='<div class="im-day">'+esc(gun)+'</div>'; sonGun=gun; }
     const saat = ts?new Date(ts).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}):'';
-    html+='<div class="im-msg '+(ben?'out':'in')+'">'+esc(m.text)+'<div class="im-time">'+esc(saat)+'</div></div>';
+    // dosya var mı? (mediaUrl/media_url)
+    const medya = m.mediaUrl || m.media_url || '';
+    const kind = m.kind || 'text';
+    const dosyaAd = m.fileName || m.file_name || 'belge';
+    let icerik='';
+    if(medya){
+      if(kind==='image'){
+        icerik='<a href="'+esc(medya)+'" target="_blank"><img src="'+esc(medya)+'" class="im-img" alt="görsel"></a>';
+        if(m.text) icerik+='<div class="im-caption">'+esc(m.text)+'</div>';
+      } else if(kind==='video'){
+        icerik='<video src="'+esc(medya)+'" controls class="im-img"></video>';
+        if(m.text) icerik+='<div class="im-caption">'+esc(m.text)+'</div>';
+      } else {
+        // belge / ses / diğer -> indirilebilir dosya kartı
+        icerik='<a href="'+esc(medya)+'" target="_blank" download class="im-dosya"><span class="im-dosya-ik">📄</span><span class="im-dosya-ad">'+esc(dosyaAd)+'</span><span class="im-dosya-in">⬇ indir</span></a>';
+        if(m.text) icerik+='<div class="im-caption">'+esc(m.text)+'</div>';
+      }
+    } else {
+      icerik=esc(m.text);
+    }
+    html+='<div class="im-msg '+(ben?'out':'in')+'">'+icerik+'<div class="im-time">'+esc(saat)+'</div></div>';
   }
   box.innerHTML=html;
   box.scrollTop=box.scrollHeight;
@@ -3136,6 +3170,27 @@ function sendInternal(){
   if(!text || !_internalOther || !connected) return;
   ws.send(JSON.stringify({type:'internalSend', to:_internalOther, text}));
   inp.value=''; inp.style.height='auto';
+}
+
+// İÇ MESAJ DOSYA GÖNDER (ekip arkadaşına) — /internal-upload'a gider, WhatsApp'a DOKUNMAZ.
+async function internalDosyaGonder(files){
+  if(!_internalOther){ showToast('Önce bir ekip arkadaşı seç.'); return; }
+  if(!files || !files.length) return;
+  // alıcıyı en başta sabitle (yükleme sırasında değişmesin)
+  const hedef=_internalOther;
+  for(const file of files){
+    const q=new URLSearchParams({to:hedef, name:file.name, mime:file.type||'application/octet-stream'});
+    if(authToken) q.set('token', authToken);
+    const boyutMB=(file.size/1048576).toFixed(1);
+    showToast('📎 '+file.name+' gönderiliyor… ('+boyutMB+' MB)');
+    try{
+      const r=await fetch('/internal-upload?'+q.toString(), {method:'POST', headers:{'Content-Type':'application/octet-stream'}, body:file});
+      let j;
+      try{ j=await r.json(); }catch(e){ j={ok:false, error:'sunucu yanıtı okunamadı'}; }
+      if(!r.ok || !j.ok){ showToast('⚠️ '+file.name+' gönderilemedi: '+(j.error||('hata '+r.status))); }
+      else { showToast('✓ '+file.name+' gönderildi'); }
+    }catch(err){ showToast('⚠️ Yükleme hatası: '+err.message); }
+  }
 }
 
 // Sekme rozeti (okunmamis ic mesaj sayisi)
@@ -3967,6 +4022,8 @@ function openChat(jid){
   // sonsuz scroll durumunu sıfırla (yeni sohbette baştan başlasın)
   _eskiYukleniyor=false;
   const eskiYukNot=document.getElementById('eskiYukNot'); if(eskiYukNot) eskiYukNot.style.display='none';
+  // alta in bildirimini sıfırla (yeni sohbette eski sayaç kalmasın)
+  _altaInSonSayi=null; sifirlaAltaInBadge();
   const c=chats[jid]; c.unread=0; c.hasMention=false;
   document.getElementById('emptyState').style.display='none';
   document.getElementById('convContent').style.display='flex';
@@ -4732,10 +4789,36 @@ function renderMessages(c, searchQ){
   // Render ONCESI: kullanici en altta miydi? (tazeleme sirasinda yukarida okuyorsa
   // ekrani zorla asagi atmayalim — sadece zaten en alttaysa takip et.)
   const altaYakin = (box.scrollHeight - box.scrollTop - box.clientHeight) < 120;
+  const oncekiMesajSayisi = (c.messages||[]).length;  // render edilen mesaj sayısı
   box.innerHTML=html;
   // Arama yapilirken pozisyonu koru. Sohbet yeni acildiysa VEYA kullanici zaten
   // en alttaysa alta in; kullanici yukari kaydirip okuyorsa pozisyonu bozma.
-  if(!searchQ && (sohbetDegisti || altaYakin)) box.scrollTop=box.scrollHeight;
+  if(!searchQ && (sohbetDegisti || altaYakin)){
+    box.scrollTop=box.scrollHeight;
+    sifirlaAltaInBadge(); // alta indik -> bildirim sıfırlansın
+  } else if(!searchQ && !sohbetDegisti && !altaYakin){
+    // Kullanıcı YUKARIDA okuyor ve yeni mesaj geldi -> bildirim rozetini artır.
+    // AMA en son gelen mesaj KENDİ mesajımsa artırma (zaten alta inecek).
+    const sonMesaj=(c.messages||[])[(c.messages||[]).length-1];
+    const sonFromMe = sonMesaj && sonMesaj.fromMe;
+    if(_altaInSonSayi!==null && oncekiMesajSayisi>_altaInSonSayi && !sonFromMe){
+      _altaInBildirim += (oncekiMesajSayisi - _altaInSonSayi);
+      const badge=document.getElementById('altaInBadge');
+      const btn=document.getElementById('altaInBtn');
+      if(badge && btn){
+        badge.textContent = _altaInBildirim>99 ? '99+' : _altaInBildirim;
+        badge.style.display='grid';
+        btn.style.display='grid'; // buton görünür olsun (yukarıdayız zaten ama garanti)
+      }
+    }
+  }
+  _altaInSonSayi = oncekiMesajSayisi;
+}
+// Alta in bildirimini sıfırla (alta inince çağrılır)
+function sifirlaAltaInBadge(){
+  _altaInBildirim=0;
+  const badge=document.getElementById('altaInBadge');
+  if(badge) badge.style.display='none';
 }
 // Acik sohbette gereksiz yeniden cizimi onlemek icin son mesaj sayisini hatirla
 let box_sonMesajSayisi=null;
@@ -4756,6 +4839,8 @@ document.getElementById('messages').addEventListener('scroll',e=>{
   const altaUzaklik = box.scrollHeight - box.scrollTop - box.clientHeight;
   const altaInBtn=document.getElementById('altaInBtn');
   if(altaInBtn) altaInBtn.style.display = altaUzaklik>300 ? 'grid' : 'none';
+  // en alta yaklaşınca (120px) bildirim rozetini sıfırla (kullanıcı yeni mesajları gördü)
+  if(altaUzaklik<120) sifirlaAltaInBadge();
   // en üste 80px yaklaşıldıysa ve yükleme yoksa ve daha eski varsa: iste
   if(box.scrollTop<80 && !_eskiYukleniyor && activeJid && !_eskiBitti[activeJid]){
     const c=chats[activeJid];
@@ -4774,6 +4859,7 @@ document.getElementById('messages').addEventListener('scroll',e=>{
 function enAltaIn(){
   const box=document.getElementById('messages');
   if(box){ box.scrollTo({top:box.scrollHeight, behavior:'smooth'}); }
+  sifirlaAltaInBadge(); // bildirimi temizle
 }
 document.getElementById('messages').addEventListener('click',e=>{
   // SEÇİM artık SADECE soldaki daireye tıklayınca olur (secimToggle).
@@ -5683,10 +5769,23 @@ function send(){
   if(replyTarget) payload.replyId=replyTarget.id;
   ws.send(JSON.stringify(payload));
   inp.value=''; inp.style.height='auto'; clearReply();
+  // KENDİ mesajını attın -> en alta in (yukarıdaysan bile). Mesaj gelince render olacak ama
+  // hemen alta inip bildirimi temizleyelim, gönderdiğini gör.
+  sifirlaAltaInBadge();
+  const box=document.getElementById('messages');
+  if(box) setTimeout(()=>{ box.scrollTo({top:box.scrollHeight, behavior:'smooth'}); }, 60);
 }
 document.getElementById('sendBtn').onclick=send;
 // IC MESAJ gonderme
 document.getElementById('internalSendBtn').onclick=sendInternal;
+// İç mesaj dosya ekleme butonu
+document.getElementById('internalAttachBtn').onclick=()=>{
+  if(!_internalOther){ showToast('Önce bir ekip arkadaşı seç.'); return; }
+  document.getElementById('internalFileInput').click();
+};
+document.getElementById('internalFileInput').addEventListener('change',e=>{
+  internalDosyaGonder([...e.target.files]); e.target.value='';
+});
 document.getElementById('internalInput').addEventListener('keydown',e=>{
   if(e.key==='Enter' && !e.shiftKey && !e.altKey){ e.preventDefault(); sendInternal(); }
 });
@@ -5815,6 +5914,13 @@ document.querySelectorAll('#filters .filter').forEach(f=>{
 // Dosya secilince/suruklenince: DIREKT gondermez, once onizleme modali acar
 let _pendingFiles=[];
 function uploadFiles(files){
+  // KRİTİK GÜVENLİK: İç mesaj (ekip içi) modundayken dosya gönderimi ENGELLENİR.
+  // Yoksa iç mesajda sürüklenen PDF, en son açık WhatsApp grubuna (activeJid) gidiyordu
+  // -> MÜŞTERİYE YANLIŞ BELGE. İç mesajda dosya gönderme özelliği yok.
+  if(_mainTab==='internal'){
+    showToast('⚠️ İç mesajlarda dosya gönderilemez. Önce bir WhatsApp sohbeti açın.');
+    return;
+  }
   if(!activeJid){ showToast('Önce bir sohbet seç.'); return; }
   if(!connected){ showToast('WhatsApp bağlı değil.'); return; }
   if(!files||!files.length) return;
@@ -6135,11 +6241,13 @@ document.addEventListener('keydown',(e)=>{
 // ---- Surukle-birak (coklu dosya dahil) ----
 const conv=document.getElementById('conv'), dropOverlay=document.getElementById('dropOverlay');
 let dragCounter=0;
-conv.addEventListener('dragenter',e=>{ e.preventDefault(); if(!activeJid)return; dragCounter++; dropOverlay.classList.add('show'); });
+conv.addEventListener('dragenter',e=>{ e.preventDefault(); if(!activeJid || _mainTab==='internal')return; dragCounter++; dropOverlay.classList.add('show'); });
 conv.addEventListener('dragover',e=>{ e.preventDefault(); });
 conv.addEventListener('dragleave',e=>{ e.preventDefault(); dragCounter--; if(dragCounter<=0){dragCounter=0;dropOverlay.classList.remove('show');} });
 conv.addEventListener('drop',e=>{
   e.preventDefault(); dragCounter=0; dropOverlay.classList.remove('show');
+  // İç mesaj modunda dosya bırakmayı engelle (yanlış gruba gitmesin)
+  if(_mainTab==='internal'){ showToast('⚠️ İç mesajlarda dosya gönderilemez.'); return; }
   if(!activeJid){ showToast('Önce bir sohbet seç.'); return; }
   const files=[...(e.dataTransfer?.files||[])];
   if(files.length) uploadFiles(files);

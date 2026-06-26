@@ -966,6 +966,76 @@ app.post('/upload', express.raw({ type: '*/*', limit: '64mb' }), async (req, res
   }
 });
 
+// ============================================================
+// İÇ MESAJ DOSYA YÜKLEME (ekip içi) — KRİTİK: WhatsApp'a HİÇ DOKUNMAZ!
+// Dosya diske kaydedilir, SADECE iç mesaj olarak alıcıya iletilir.
+// Boylece hicbir sekilde yanlis WhatsApp grubuna gitme riski YOKTUR.
+// ============================================================
+app.post('/internal-upload', express.raw({ type: '*/*', limit: '64mb' }), async (req, res) => {
+  try {
+    // KIMLIK: token'dan gonderen kullaniciyi bul
+    const s = req.query.token && sessions.get(req.query.token);
+    if (!s || !s.username) return res.status(401).json({ error: 'Oturum bulunamadı.' });
+    if (!db.isReady()) return res.status(503).json({ error: 'Veritabanı bağlı değil.' });
+
+    const fromUser = s.username;
+    const toUser = (req.query.to || '').trim();
+    if (!toUser) return res.status(400).json({ error: 'Alıcı belirtilmedi.' });
+
+    let fileName = req.query.name ? decodeURIComponent(req.query.name) : '';
+    const mime = req.query.mime || 'application/octet-stream';
+    if (!fileName) fileName = 'belge';
+
+    // dosyayi diske kaydet (panelde gostermek icin)
+    const ext = fileName.includes('.') ? fileName.split('.').pop() : 'bin';
+    const savedName = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const dosyaBuf = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body);
+    if (!dosyaBuf.length) return res.status(400).json({ error: 'Dosya alınamadı.' });
+    const boyutMB = (dosyaBuf.length / 1048576).toFixed(2);
+    fs.writeFileSync(path.join(MEDIA_DIR, savedName), dosyaBuf);
+    const webPath = '/media/' + savedName;
+
+    // tip belirle (panel ikonu icin)
+    let kind = 'document';
+    if (mime.startsWith('image/')) kind = 'image';
+    else if (mime.startsWith('video/')) kind = 'video';
+    else if (mime.startsWith('audio/')) kind = 'audio';
+
+    // ic mesaj olarak kaydet (text yerine dosya)
+    const mid = 'im_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    const caption = req.query.caption ? decodeURIComponent(req.query.caption) : '';
+    const r = await db.saveInternalMessage({
+      id: mid, from: fromUser, to: toUser,
+      text: caption, mediaUrl: webPath, fileName, kind, ts: Date.now(),
+    });
+    if (!r.ok) return res.status(500).json({ error: 'İç mesaj kaydedilemedi.' });
+
+    console.log(`📎➡️👤 İç mesaj dosyası: ${fileName} (${boyutMB} MB) | ${fromUser} -> ${toUser}`);
+
+    const payload = {
+      id: mid, from: fromUser, fromName: s.displayName || fromUser, to: toUser,
+      text: caption, mediaUrl: webPath, fileName, kind, ts: r.row?.ts || Date.now(),
+    };
+    // gonderene + aliciya canli ilet (tum acik WS'lerine)
+    let aliciCevrimici = false;
+    wss.clients.forEach((c) => {
+      if (c.readyState === 1 && (c._username === fromUser || c._username === toUser)) {
+        c.send(JSON.stringify({ type: 'internalMessage', msg: payload }));
+        if (c._username === toUser) aliciCevrimici = true;
+      }
+    });
+    if (aliciCevrimici) {
+      const n = await db.internalUnreadCount(toUser);
+      wss.clients.forEach((c) => { if (c.readyState === 1 && c._username === toUser) c.send(JSON.stringify({ type: 'internalUnread', count: n })); });
+    }
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('İç mesaj dosya yukleme hatasi:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GRUP FOTOGRAFINI DEGISTIR (sadece grup yoneticisi yapabilir).
 // Panelden secilen fotograf -> WhatsApp grubuna profil resmi olarak yuklenir.
 // Hat-izole: hangi panel istediyse (token) o hattin soketiyle yuklenir.

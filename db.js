@@ -586,15 +586,27 @@ function _convKey(a, b) {
 async function saveInternalMessage(m) {
   if (!aktif) return { ok: false, error: 'DB bagli degil' };
   try {
+    // Once dosya sutunlari (media_url, file_name, kind) DAHIL kaydetmeyi dene.
     const r = await pool.query(
-      `INSERT INTO internal_messages (id, conv_key, from_user, to_user, text, ts, read_at, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,NULL, now())
-       RETURNING id, conv_key, from_user, to_user, text, ts, read_at`,
-      [m.id, _convKey(m.from, m.to), m.from, m.to, m.text || '', m.ts || Date.now()]
+      `INSERT INTO internal_messages (id, conv_key, from_user, to_user, text, media_url, file_name, kind, ts, read_at, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL, now())
+       RETURNING id, conv_key, from_user, to_user, text, media_url, file_name, kind, ts, read_at`,
+      [m.id, _convKey(m.from, m.to), m.from, m.to, m.text || '', m.mediaUrl || null, m.fileName || null, m.kind || 'text', m.ts || Date.now()]
     );
     return { ok: true, row: r.rows[0] };
   } catch (e) {
-    return { ok: false, error: e.message, _hata: true };
+    // Dosya sutunlari HENUZ eklenmediyse: dosyasiz (sadece text) kaydet ki mesaj kaybolmasin.
+    try {
+      const r2 = await pool.query(
+        `INSERT INTO internal_messages (id, conv_key, from_user, to_user, text, ts, read_at, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,NULL, now())
+         RETURNING id, conv_key, from_user, to_user, text, ts, read_at`,
+        [m.id, _convKey(m.from, m.to), m.from, m.to, m.text || '', m.ts || Date.now()]
+      );
+      return { ok: true, row: r2.rows[0] };
+    } catch (e2) {
+      return { ok: false, error: e2.message, _hata: true };
+    }
   }
 }
 
@@ -602,8 +614,9 @@ async function saveInternalMessage(m) {
 async function loadInternalConversation(userA, userB, limit = 200) {
   if (!aktif) return [];
   try {
+    // Once dosya sutunlari (media_url, file_name, kind) DAHIL cekmeyi dene.
     const r = await pool.query(
-      `SELECT id, from_user, to_user, text, ts, read_at
+      `SELECT id, from_user, to_user, text, media_url, file_name, kind, ts, read_at
          FROM internal_messages
         WHERE conv_key = $1
         ORDER BY ts ASC
@@ -611,7 +624,20 @@ async function loadInternalConversation(userA, userB, limit = 200) {
       [_convKey(userA, userB), limit]
     );
     return r.rows;
-  } catch (e) { return []; }
+  } catch (e) {
+    // dosya sutunlari yoksa: dosyasiz cek (eski tablo yapisi)
+    try {
+      const r2 = await pool.query(
+        `SELECT id, from_user, to_user, text, ts, read_at
+           FROM internal_messages
+          WHERE conv_key = $1
+          ORDER BY ts ASC
+          LIMIT $2`,
+        [_convKey(userA, userB), limit]
+      );
+      return r2.rows;
+    } catch (e2) { return []; }
+  }
 }
 
 // Bir kullanicinin TUM konusma ozetleri: kiminle, son mesaj, okunmamis sayisi

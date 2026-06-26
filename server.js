@@ -2460,6 +2460,50 @@ function aktiviteMesajiTespit(text) {
   return null;
 }
 
+// ════════════════════════════════════════════════════════════════
+// TAKİP UYARISI: bir grupta "ilgileniyorum/kesiyorum" yazılıp 4 DK boyunca
+// O GRUPTA HİÇ MESAJ gelmezse, YÖNETİCİ paneline "takipte kalmış olabilir" kartı düşer.
+// O grupta herhangi biri (gelen/giden) yazınca uyarı İPTAL olur.
+// ════════════════════════════════════════════════════════════════
+const TAKIP_BEKLEME_MS = 4 * 60 * 1000; // 4 dakika
+const _takipUyari = new Map(); // jid -> { timer, kisi, tur, grupAd, lineId, ts }
+
+function takipUyarisiBaslat(jid, kisi, tur, grupAd, lineId) {
+  // önceki timer varsa iptal et (yeni aktivite, süre baştan)
+  const eski = _takipUyari.get(jid);
+  if (eski && eski.timer) clearTimeout(eski.timer);
+  const timer = setTimeout(() => {
+    // 4 dk doldu, hiç mesaj gelmedi -> yöneticilere kart gönder
+    _takipUyari.delete(jid);
+    const turYazi = tur === 'kesim' ? 'kesim/işlem' : 'ilgileniyorum';
+    const payload = {
+      type: 'takipUyari',
+      jid,
+      grupAd: grupAd || (jid || '').split('@')[0],
+      kisi: kisi || '',
+      tur,
+      turYazi,
+      mesaj: `"${kisi || 'Biri'}" ${turYazi} dedi ama 4 dk'dır bu grupta işlem yok. Takipte kalmış olabilir mi?`,
+    };
+    // SADECE bu hattın YÖNETİCİ panellerine gönder
+    wss.clients.forEach((c) => {
+      try {
+        if (c.readyState === 1 && c._role === 'admin' && (c._lineId || 'ofis') === lineId) {
+          c.send(JSON.stringify(payload));
+        }
+      } catch (e) {}
+    });
+    console.log(`🔔 TAKİP UYARISI: ${grupAd} | ${kisi} ${turYazi} dedi, 4dk işlem yok -> yöneticiye bildirildi`);
+  }, TAKIP_BEKLEME_MS);
+  _takipUyari.set(jid, { timer, kisi, tur, grupAd, lineId, ts: Date.now() });
+}
+
+// O grupta herhangi bir mesaj gelince takip uyarısını iptal et (sorun yok demektir)
+function takipUyarisiIptal(jid) {
+  const v = _takipUyari.get(jid);
+  if (v && v.timer) { clearTimeout(v.timer); _takipUyari.delete(jid); }
+}
+
 // Bir satis komutunu DB'ye kaydet (hat-izole). Panele de canli haber verir.
 // m: ham WhatsApp mesaji, parsed: {urun, adet}, lineId: hat, chat: sohbet objesi
 // Son islenen satislar (mukerrer koruma): "lineId|mesajId|grup" -> zaman.
@@ -4207,13 +4251,16 @@ async function startWA(lineId = 'ofis') {
         }
       }
 
+      // TAKİP UYARISI İPTALİ: bu grupta yeni bir mesaj geldi -> bekleyen takip uyarısı varsa iptal et.
+      // (Aktivite mesajının KENDİSİ timer'ı başlatır; o yüzden aktivite DEĞİLSE iptal ediyoruz.
+      //  Böylece "ilgileniyorum" yazan mesaj kendi timer'ını iptal etmez, ama sonraki herhangi
+      //  bir mesaj -gelen ya da giden- iptal eder = "grupta hareket var, sorun yok".)
+      if (isGroup && _takipUyari.has(jid)) {
+        const buAktivite = aktiviteMesajiTespit(info.text);
+        if (!buAktivite) takipUyarisiIptal(jid);
+      }
+
       addMessage(jid, {
-        id: m.key.id,
-        raw: m,
-        key: m.key,
-        fromMe: fromMe,
-        kind: info.kind,
-        text: info.text,
         caption: info.caption || '', // belge/dosya aciklamasi (varsa)
         fileName: info._fileName || undefined, // belge adi (iletme icin saklanir)
         mime: info._mime || undefined,         // belge tipi (iletme icin saklanir)
@@ -4266,6 +4313,11 @@ async function startWA(lineId = 'ofis') {
               hamMesaj: (info.text || '').slice(0, 80),
               ts: m.messageTimestamp ? Number(m.messageTimestamp) * 1000 : Date.now(),
             }).catch(() => {});
+            // TAKİP UYARISI: bu gruba 4 dk içinde işlem gelmezse yöneticiye haber ver.
+            // (sadece GRUPTA mantıklı — kişi sohbetinde takip uyarısı yok)
+            if (isGroup) {
+              takipUyarisiBaslat(jid, aktKisiAdi, akt.tur, chatObj2?.name || (jid || '').split('@')[0], lineId);
+            }
           }
         }
       }

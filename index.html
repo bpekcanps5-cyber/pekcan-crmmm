@@ -1006,6 +1006,19 @@
   .msg.out.secim-modu{margin-left:34px;margin-right:4px}
   /* Toast bildirim */
   #toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:13px 22px;border-radius:13px;font-size:13.5px;font-weight:600;box-shadow:var(--shadow-lg);z-index:300;opacity:0;transition:all .3s cubic-bezier(.2,.8,.2,1);pointer-events:none;display:flex;align-items:center;gap:9px}
+  /* ── TAKİP UYARI KARTLARI (sağ altta, yöneticiye) ── */
+  #takipKartlar{position:fixed;bottom:24px;right:24px;z-index:280;display:flex;flex-direction:column;gap:12px;max-width:360px}
+  .takip-kart{background:var(--panel);border:1px solid var(--border-soft);border-left:4px solid #f59e0b;border-radius:14px;padding:14px 16px;box-shadow:var(--shadow-lg);cursor:pointer;transition:all .2s;animation:takipGir .35s cubic-bezier(.2,.8,.2,1);position:relative}
+  .takip-kart:hover{transform:translateX(-3px);border-left-color:#d97706;box-shadow:0 12px 32px rgba(0,0,0,.25)}
+  @keyframes takipGir{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+  .takip-kart .tk-ust{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .takip-kart .tk-ikon{font-size:18px;flex-shrink:0}
+  .takip-kart .tk-baslik{font-size:12.5px;font-weight:800;color:#d97706;text-transform:uppercase;letter-spacing:.4px}
+  .takip-kart .tk-grup{font-size:14.5px;font-weight:700;color:var(--text);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .takip-kart .tk-mesaj{font-size:13px;color:var(--muted);line-height:1.4}
+  .takip-kart .tk-alt{margin-top:9px;font-size:11.5px;color:var(--brand);font-weight:700}
+  .takip-kart .tk-kapat{position:absolute;top:10px;right:11px;width:22px;height:22px;border:none;background:var(--panel-2);border-radius:50%;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;display:grid;place-items:center}
+  .takip-kart .tk-kapat:hover{background:var(--danger);color:#fff}
   #toast.show{transform:translateX(-50%) translateY(0);opacity:1}
   #toast svg{width:18px;height:18px;color:var(--brand-hi)}
   /* Mesaj secim modu */
@@ -1745,6 +1758,7 @@
 </div>
 
 <div id="toast"></div>
+<div id="takipKartlar"></div>
 
 <div class="modal-bg" id="forwardModal">
   <div class="modal" style="width:440px;max-width:94vw">
@@ -1890,6 +1904,46 @@ function showToast(msg){
   t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+}
+// TAKİP UYARI KARTI: sağ altta, yöneticiye. Tıklayınca o grup açılır.
+const _takipKartGosterilen=new Set(); // aynı grup için üst üste kart yığılmasın
+function takipKartiGoster(d){
+  const kaplar=document.getElementById('takipKartlar');
+  if(!kaplar) return;
+  // aynı grup için zaten kart varsa tekrar gösterme
+  if(_takipKartGosterilen.has(d.jid)) return;
+  _takipKartGosterilen.add(d.jid);
+  const kart=document.createElement('div');
+  kart.className='takip-kart';
+  const turIkon = d.tur==='kesim' ? '✂️' : '👀';
+  kart.innerHTML=
+    '<button class="tk-kapat" title="Kapat">✕</button>'+
+    '<div class="tk-ust"><span class="tk-ikon">'+turIkon+'</span><span class="tk-baslik">Takip uyarısı</span></div>'+
+    '<div class="tk-grup">'+esc(d.grupAd||'Grup')+'</div>'+
+    '<div class="tk-mesaj">'+esc(d.mesaj||'')+'</div>'+
+    '<div class="tk-alt">Gruba gitmek için tıkla →</div>';
+  // karta tıkla -> o grubu aç
+  kart.addEventListener('click',(e)=>{
+    if(e.target.classList.contains('tk-kapat')) return; // kapat butonu hariç
+    if(chats[d.jid]){
+      if(_mainTab!=='chats') switchMainTab('chats');
+      openChat(d.jid);
+    } else {
+      showToast('Grup bulunamadı: '+(d.grupAd||''));
+    }
+    kartKaldir();
+  });
+  // kapat butonu
+  kart.querySelector('.tk-kapat').addEventListener('click',(e)=>{ e.stopPropagation(); kartKaldir(); });
+  function kartKaldir(){
+    kart.style.animation='takipGir .25s reverse';
+    setTimeout(()=>{ kart.remove(); _takipKartGosterilen.delete(d.jid); }, 250);
+  }
+  kaplar.appendChild(kart);
+  // 30 sn sonra otomatik kaybol (yönetici görmediyse bile yığılmasın)
+  setTimeout(()=>{ if(kart.parentNode){ kartKaldir(); } }, 30000);
+  // hafif ses (varsa)
+  try{ playPing(); }catch(e){}
 }
 function groupSvg(){return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>';}
 function docSvg(){return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>';}
@@ -2311,6 +2365,10 @@ function connect(){
     else if(d.type==='satisBildirim'){
       // yoneticiye: yeni satis geldi (hafif bildirim)
       if(_mainTab!=='kontrol'){ const b=document.getElementById('kontrolBadge'); if(b){ b.style.display=''; b.textContent=(parseInt(b.textContent||'0',10)+1); } }
+    }
+    else if(d.type==='takipUyari'){
+      // YÖNETİCİYE: bir grupta ilgilenildi/kesim dendi ama 4dk işlem yok -> takip kartı göster
+      takipKartiGoster(d);
     }
     else if(d.type==='satisDuzenlemeBildirim'){
       // yoneticiye: bir pazarlamaci satis duzenledi — dikkat cek

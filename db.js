@@ -263,32 +263,55 @@ async function loadMessages(chatJid, limit = 60, lineId = 'ofis', beforeTs = nul
 // Eşleşen her sohbet için: kaç eşleşme + en son eşleşen mesajın özeti döner.
 // ============================================================
 async function searchMessages(kelime, lineId = 'ofis', limit = 40) {
-  if (!aktif || !kelime || kelime.trim().length < 2) return [];
+  if (!aktif || !kelime || kelime.trim().length < 2) return { sohbetler: [], mesajlar: [] };
   try {
-    const q = '%' + kelime.trim().toLowerCase() + '%';
-    // ILIKE = büyük/küçük harf duyarsız. Son SAKLAMA_GUN içinde, bu hatta ait.
-    const r = await pool.query(
-      `SELECT chat_jid,
-              COUNT(*) AS eslesme,
-              MAX(ts) AS son_ts,
-              (ARRAY_AGG(text ORDER BY ts DESC))[1] AS son_text
+    // ÇOK KELİMELİ ARAMA: "araç motor" -> hem "araç" hem "motor" geçen mesajlar (ayrı ayrı).
+    // Tek kelime gibi "%araç motor%" aramak, kelimeler ardışık değilse bulamıyordu.
+    const kelimeler = kelime.trim().toLowerCase().split(/\s+/).filter(k => k.length >= 2).slice(0, 5);
+    if (!kelimeler.length) return { sohbetler: [], mesajlar: [] };
+    // her kelime için ayrı LIKE koşulu (hepsi geçmeli = AND)
+    const kosullar = [];
+    const params = [lineId, eskiEsikMs()];
+    for (const k of kelimeler) {
+      params.push('%' + k + '%');
+      const idx = params.length;
+      kosullar.push(`(LOWER(text) LIKE $${idx} OR LOWER(caption) LIKE $${idx})`);
+    }
+    const kosulSql = kosullar.join(' AND ');
+
+    // 1) SOHBET ÖZETİ: hangi sohbette kaç eşleşme
+    const ozet = await pool.query(
+      `SELECT chat_jid, COUNT(*) AS eslesme, MAX(ts) AS son_ts
        FROM messages
-       WHERE line_id = $1 AND ts >= $2
-         AND (LOWER(text) LIKE $3 OR LOWER(caption) LIKE $3)
+       WHERE line_id = $1 AND ts >= $2 AND ${kosulSql}
        GROUP BY chat_jid
        ORDER BY son_ts DESC
-       LIMIT $4`,
-      [lineId, eskiEsikMs(), q, limit]
+       LIMIT ${limit}`,
+      params
     );
-    return r.rows.map(x => ({
-      chatJid: x.chat_jid,
-      eslesme: Number(x.eslesme) || 0,
-      sonTs: Number(x.son_ts) || 0,
-      sonText: x.son_text || '',
-    }));
+    // 2) EŞLEŞEN MESAJLAR (WhatsApp gibi "Mesajlar" bölümü).
+    //    NOT: messages tablosunda chat_name sütunu YOK — sohbet adını panel kendi belleğinden alır.
+    const msgs = await pool.query(
+      `SELECT id, chat_jid, text, caption, sender, from_me, ts, time
+       FROM messages
+       WHERE line_id = $1 AND ts >= $2 AND ${kosulSql}
+       ORDER BY ts DESC
+       LIMIT 60`,
+      params
+    );
+    return {
+      sohbetler: ozet.rows.map(x => ({
+        chatJid: x.chat_jid, eslesme: Number(x.eslesme) || 0, sonTs: Number(x.son_ts) || 0,
+      })),
+      mesajlar: msgs.rows.map(m => ({
+        id: m.id, chatJid: m.chat_jid, chatName: '',
+        text: m.text || m.caption || '', sender: m.sender || '', fromMe: m.from_me || false,
+        ts: Number(m.ts) || 0, time: m.time || '',
+      })),
+    };
   } catch (e) {
     console.error('⚠️  searchMessages hatasi:', e.message);
-    return [];
+    return { sohbetler: [], mesajlar: [] };
   }
 }
 

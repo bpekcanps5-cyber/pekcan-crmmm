@@ -181,6 +181,16 @@
   .rail-ayrac{width:32px;height:1px;background:rgba(255,255,255,.1);margin:8px 0 6px}
   .rail-etiketler{display:flex;flex-direction:column;align-items:center;gap:9px;width:100%;max-height:42vh;overflow-y:auto;padding:2px 0}
   .rail-etiketler::-webkit-scrollbar{width:0}
+  /* ── GENEL İNCE ŞIK SCROLLBAR (tüm panel: modallar, listeler, her yer) ── */
+  /* Firefox */
+  *{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+  /* Chrome/Safari/Edge — ince, yuvarlak, hover'da belirginleşir */
+  *::-webkit-scrollbar{width:7px;height:7px}
+  *::-webkit-scrollbar-track{background:transparent}
+  *::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--muted) 35%,transparent);border-radius:10px}
+  *::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb,var(--muted) 60%,transparent)}
+  *::-webkit-scrollbar-button{display:none;width:0;height:0}
+  *::-webkit-scrollbar-corner{background:transparent}
   .rail-etiket{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;cursor:pointer;position:relative;transition:all .18s;flex-shrink:0}
   .rail-etiket:hover{transform:scale(1.12)}
   .rail-etiket .re-nokta{width:18px;height:18px;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.35);transition:all .18s}
@@ -521,6 +531,10 @@
   .messages{flex:1;overflow-y:auto;padding:24px 4%;display:flex;flex-direction:column;gap:5px;min-height:0;background:transparent}
   /* sonsuz scroll: daha eski mesaj yükleniyor göstergesi (mesaj alanı üstünde) */
   .eski-yuk-not{position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:6;margin-top:8px;background:var(--panel);color:var(--muted);font-size:12px;font-weight:600;padding:6px 16px;border-radius:20px;box-shadow:var(--shadow-sm);border:1px solid var(--border-soft)}
+  /* "en alta in" butonu — sağ altta yuvarlak, sohbet yukarıdayken görünür */
+  .alta-in-btn{position:absolute;right:18px;bottom:90px;z-index:6;width:42px;height:42px;border-radius:50%;border:1px solid var(--border-soft);background:var(--panel);color:var(--muted);cursor:pointer;display:grid;place-items:center;box-shadow:var(--shadow-md);transition:all .15s;opacity:.92}
+  .alta-in-btn:hover{background:var(--brand);color:#fff;border-color:var(--brand);transform:translateY(-2px);opacity:1}
+  .alta-in-btn svg{width:24px;height:24px}
   .messages>*:first-child{margin-top:auto}
   .messages::-webkit-scrollbar{width:8px}
   .messages::-webkit-scrollbar-thumb{background:rgba(120,140,138,.3);border-radius:5px}
@@ -1221,6 +1235,9 @@
         <button class="primary" onclick="forwardSelected()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11z"/></svg>İlet</button>
       </div>
       <div class="eski-yuk-not" id="eskiYukNot" style="display:none">⏳ Daha eski mesajlar yükleniyor…</div>
+      <button class="alta-in-btn" id="altaInBtn" onclick="enAltaIn()" title="En alta in" style="display:none">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+      </button>
       <div class="messages" id="messages"></div>
       <div class="mention-list" id="mentionList"></div>
       <div class="reply-preview" id="replyPreview">
@@ -1364,6 +1381,7 @@
   <div class="modal" style="width:420px;max-width:94vw">
     <h3>Kime mesaj?</h3>
     <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Mesajlaşmak istediğin ekip arkadaşını seç.</p>
+    <input type="text" id="internalUserSearch" class="um-input" placeholder="🔍 Kullanıcı ara…" autocomplete="off" oninput="filterInternalPicker()" style="width:100%;margin-bottom:12px">
     <div id="internalUserPicker" style="display:flex;flex-direction:column;gap:4px;max-height:340px;overflow-y:auto"></div>
     <div class="modal-btns" style="margin-top:16px">
       <button class="btn ghost" onclick="document.getElementById('internalNewModal').classList.remove('show')">Kapat</button>
@@ -1613,6 +1631,7 @@
   <div class="modal" style="width:440px;max-width:94vw">
     <h3>Gruba kişi etiketle</h3>
     <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Ekip üyelerini seç. Etiketlenenler bu gruba bağlanır; gruba mesaj/bahsedilme gelince onların bahsedilmelerinde görünür. İşin bitince kendini çıkarabilirsin.</p>
+    <input type="text" id="assignSearch" class="um-input" placeholder="🔍 Kullanıcı ara…" autocomplete="off" oninput="renderAssignList()" style="width:100%;margin-bottom:12px">
     <div id="assignList" style="display:flex;flex-direction:column;gap:7px;max-height:340px;overflow-y:auto"></div>
     <div class="modal-btns" style="margin-top:16px">
       <button class="btn ghost" id="assignClose">Kapat</button>
@@ -2051,6 +2070,16 @@ function connect(){
       renderList();
       // acik sohbet varsa basligini tazele
       if(activeJid&&chats[activeJid]) updateConvHeader(chats[activeJid], activeJid);
+    }
+    else if(d.type==='searchMessagesResult'){
+      // MESAJ İÇERİĞİNDE ARAMA sonucu geldi. Sadece güncel arama kelimesiyle eşleşiyorsa uygula
+      // (eski/yavaş gelen sonuç güncel aramayı bozmasın).
+      if((searchTerm||'').trim().toLocaleLowerCase('tr') !== (d.q||'').toLocaleLowerCase('tr')) return;
+      _mesajAramaSonuc={};
+      for(const s of (d.sonuclar||[])){
+        _mesajAramaSonuc[s.chatJid]={eslesme:s.eslesme, sonText:s.sonText};
+      }
+      renderList(); // sohbet içinde eşleşenler de listeye girsin
     }
     else if(d.type==='olderMessages'){
       // SONSUZ SCROLL: daha eski mesajlar geldi -> sohbetin BAŞINA ekle, scroll'u koru.
@@ -3113,15 +3142,26 @@ function openInternalNew(){
   // kendim haric ekip uyeleri
   const digerleri=_internalUsers.filter(u=>u.username!==_internalMe);
   if(!digerleri.length){ showToast('Mesajlaşacak başka kullanıcı yok.'); return; }
-  // basit secim modali (mevcut askConfirm tarzi yerine kucuk liste)
+  const as=document.getElementById('internalUserSearch'); if(as) as.value=''; // arama sıfırla
+  _internalPickerListe=digerleri; // filtre için sakla
+  cizInternalPicker(digerleri);
+  document.getElementById('internalNewModal').classList.add('show');
+}
+let _internalPickerListe=[];
+function cizInternalPicker(liste){
   const sec=document.getElementById('internalUserPicker');
-  sec.innerHTML=digerleri.map(u=>(
+  if(!liste.length){ sec.innerHTML='<div style="color:var(--faint);font-size:13px;padding:14px;text-align:center">Eşleşen kullanıcı yok</div>'; return; }
+  sec.innerHTML=liste.map(u=>(
     '<div class="iup-item" onclick="pickInternalUser(\''+esc(u.username)+'\')">'
     + '<div class="avatar" style="background:linear-gradient(140deg,#6366f1,#4f46e5);width:38px;height:38px">'+esc(initials(u.displayName||u.username))+'</div>'
     + '<div><div style="font-weight:600;font-size:14px">'+esc(u.displayName||u.username)+'</div><div style="font-size:12px;color:var(--muted)">@'+esc(u.username)+'</div></div>'
     + '</div>'
   )).join('');
-  document.getElementById('internalNewModal').classList.add('show');
+}
+function filterInternalPicker(){
+  const q=(document.getElementById('internalUserSearch')?.value||'').toLocaleLowerCase('tr').trim();
+  const liste=q ? _internalPickerListe.filter(u=>(u.displayName||'').toLocaleLowerCase('tr').includes(q)||(u.username||'').toLocaleLowerCase('tr').includes(q)) : _internalPickerListe;
+  cizInternalPicker(liste);
 }
 function pickInternalUser(username){
   document.getElementById('internalNewModal').classList.remove('show');
@@ -3683,6 +3723,8 @@ function visible(){
         // grup uyelerinin isim/numarasinda ara (yuklenmis uyeler icinde)
         bulundu = c.members.some(mb => (aramaNormalize(mb.name).includes(st)) || ((mb.number||'').includes(st.replace(/\D/g,''))&&st.replace(/\D/g,'').length>0));
       }
+      // MESAJ İÇERİĞİNDE eşleşme (sunucudan gelen _mesajAramaSonuc) — sohbet adında olmasa bile göster
+      if(!bulundu && _mesajAramaSonuc && _mesajAramaSonuc[c.jid]) bulundu=true;
       if(!bulundu) return false;
     }
     return true;
@@ -4093,6 +4135,7 @@ function kopyalaFallback(metin){
 // atama butonuna basinca modal ac
 function grupAtamaAc(){
   if(!activeJid || !chats[activeJid] || !chats[activeJid].isGroup){ showToast('Önce bir grup aç.'); return; }
+  const as=document.getElementById('assignSearch'); if(as) as.value=''; // arama sıfırla
   document.getElementById('assignModal').classList.add('show');
   renderAssignList();
   // ekip listesi yoksa iste
@@ -4104,7 +4147,11 @@ function renderAssignList(){
   const c=chats[activeJid];
   const atananlar=(c&&c.atananlar)||[];
   if(!_team.length){ box.innerHTML='<div style="color:var(--faint);font-size:13px;padding:10px">Ekip yükleniyor…</div>'; return; }
-  box.innerHTML=_team.map(u=>{
+  // arama filtresi (isim veya kullanıcı adı)
+  const q=(document.getElementById('assignSearch')?.value||'').toLocaleLowerCase('tr').trim();
+  const liste=q ? _team.filter(u=>(u.displayName||'').toLocaleLowerCase('tr').includes(q)||(u.username||'').toLocaleLowerCase('tr').includes(q)) : _team;
+  if(!liste.length){ box.innerHTML='<div style="color:var(--faint);font-size:13px;padding:14px;text-align:center">Eşleşen kullanıcı yok</div>'; return; }
+  box.innerHTML=liste.map(u=>{
     const atanmis=atananlar.includes(u.username);
     const benim = currentUser && u.username===currentUser.username;
     return '<div class="assign-row'+(atanmis?' atanmis':'')+'" onclick="atamaToggle(\''+esc(u.username)+'\','+(atanmis?'true':'false')+')">'+
@@ -4644,6 +4691,10 @@ const selectedMsgs=new Set();
 // ── SONSUZ SCROLL: en yukarı yaklaşınca daha eski mesajları getir ──
 document.getElementById('messages').addEventListener('scroll',e=>{
   const box=e.target;
+  // "en alta in" butonu: en alttan 300px+ yukarıdaysak göster, değilse gizle
+  const altaUzaklik = box.scrollHeight - box.scrollTop - box.clientHeight;
+  const altaInBtn=document.getElementById('altaInBtn');
+  if(altaInBtn) altaInBtn.style.display = altaUzaklik>300 ? 'grid' : 'none';
   // en üste 80px yaklaşıldıysa ve yükleme yoksa ve daha eski varsa: iste
   if(box.scrollTop<80 && !_eskiYukleniyor && activeJid && !_eskiBitti[activeJid]){
     const c=chats[activeJid];
@@ -4658,6 +4709,11 @@ document.getElementById('messages').addEventListener('scroll',e=>{
     ws.send(JSON.stringify({type:'loadOlder', jid:activeJid, beforeTs:enEski.ts}));
   }
 });
+// En alta kaydır (sağ alt buton)
+function enAltaIn(){
+  const box=document.getElementById('messages');
+  if(box){ box.scrollTo({top:box.scrollHeight, behavior:'smooth'}); }
+}
 document.getElementById('messages').addEventListener('click',e=>{
   // SEÇİM artık SADECE soldaki daireye tıklayınca olur (secimToggle).
   // Mesajın kendisine tıklamak ARTIK seçim YAPMAZ — metin seçip kopyalamayı bozmasın,
@@ -5656,11 +5712,24 @@ document.getElementById('search').addEventListener('input',e=>{
   // metin varsa carpiyi goster, yoksa gizle
   document.getElementById('searchClear').style.display = searchTerm ? 'flex' : 'none';
   renderList();
+  // MESAJ İÇERİĞİNDE ARAMA (WhatsApp gibi): 2+ harf yazınca sunucuya sor (debounce 350ms).
+  clearTimeout(_msgSearchTimer);
+  const kelime=searchTerm.trim();
+  if(kelime.length>=2 && connected){
+    _msgSearchTimer=setTimeout(()=>{
+      ws.send(JSON.stringify({type:'searchMessages', q:kelime}));
+    }, 350);
+  } else {
+    _mesajAramaSonuc={}; // arama temizlenince mesaj sonuçlarını sıfırla
+  }
 });
+let _msgSearchTimer=null;
+let _mesajAramaSonuc={}; // jid -> {eslesme, sonText} mesaj içinde eşleşen sohbetler
 // arama temizleme carpisi
 document.getElementById('searchClear').onclick=()=>{
   const inp=document.getElementById('search');
   inp.value=''; searchTerm='';
+  _mesajAramaSonuc={}; clearTimeout(_msgSearchTimer); // mesaj arama sonuçlarını sıfırla
   document.getElementById('searchClear').style.display='none';
   inp.focus();
   renderList();

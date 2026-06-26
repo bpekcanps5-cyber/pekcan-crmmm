@@ -258,7 +258,40 @@ async function loadMessages(chatJid, limit = 60, lineId = 'ofis', beforeTs = nul
 }
 
 // ============================================================
-// ESKI MESAJ TEMIZLIGI — SAKLAMA_GUN'den eski mesajlari Supabase'den sil.
+// MESAJ İÇERİĞİNDE ARAMA (WhatsApp gibi — sohbet adı değil, mesaj metni içinde)
+// Verilen kelimeyi bu hatta ait mesajların text/caption alanlarında arar.
+// Eşleşen her sohbet için: kaç eşleşme + en son eşleşen mesajın özeti döner.
+// ============================================================
+async function searchMessages(kelime, lineId = 'ofis', limit = 40) {
+  if (!aktif || !kelime || kelime.trim().length < 2) return [];
+  try {
+    const q = '%' + kelime.trim().toLowerCase() + '%';
+    // ILIKE = büyük/küçük harf duyarsız. Son SAKLAMA_GUN içinde, bu hatta ait.
+    const r = await pool.query(
+      `SELECT chat_jid,
+              COUNT(*) AS eslesme,
+              MAX(ts) AS son_ts,
+              (ARRAY_AGG(text ORDER BY ts DESC))[1] AS son_text
+       FROM messages
+       WHERE line_id = $1 AND ts >= $2
+         AND (LOWER(text) LIKE $3 OR LOWER(caption) LIKE $3)
+       GROUP BY chat_jid
+       ORDER BY son_ts DESC
+       LIMIT $4`,
+      [lineId, eskiEsikMs(), q, limit]
+    );
+    return r.rows.map(x => ({
+      chatJid: x.chat_jid,
+      eslesme: Number(x.eslesme) || 0,
+      sonTs: Number(x.son_ts) || 0,
+      sonText: x.son_text || '',
+    }));
+  } catch (e) {
+    console.error('⚠️  searchMessages hatasi:', e.message);
+    return [];
+  }
+}
+
 // Gunde bir kez calistirilir (server.js startCleanup). Sohbet/kisi/ayar KORUNUR;
 // sadece eski MESAJLAR silinir, boylece veritabani kucuk ve hizli kalir.
 // ============================================================
@@ -1007,7 +1040,7 @@ function startCleanup() {
 module.exports = {
   init, test, isReady, startKeepAlive,
   saveChat, saveMessage, saveContact, saveSetting, getSetting,
-  loadAll, loadMessages, deleteMessage, wipeAll, wipeGroups,
+  loadAll, loadMessages, deleteMessage, wipeAll, wipeGroups, searchMessages,
   cleanupOld, startCleanup,
   ensureAdmin, checkLogin, addUser, listUsers, deleteUser, setUserRole, updateUser,
   saveInternalMessage, loadInternalConversation, listInternalConversations,

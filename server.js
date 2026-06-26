@@ -863,6 +863,7 @@ app.post('/upload', express.raw({ type: '*/*', limit: '64mb' }), async (req, res
     try {
       // YANIT (reply): panel replyId gonderdiyse, o mesaji bulup dosyayi ona YANIT olarak gonder.
       // Yanitlanan mesajin 'raw'ini bellekteki sohbetten buluruz (quoted icin gerekli).
+      // raw YOKSA (DB'den yuklenen eski mesaj) key'den quoted INSA EDERIZ — tıpkı metin yanıtı gibi.
       let gonderOpt = {};
       const replyId = req.query.replyId;
       if (replyId) {
@@ -870,7 +871,20 @@ app.post('/upload', express.raw({ type: '*/*', limit: '64mb' }), async (req, res
           const C2 = hatChats(upLineId);
           const chat2 = C2 && C2.get ? C2.get(jid) : null;
           const orijMsg = chat2 && chat2.messages ? chat2.messages.find(x => x && x.id === replyId) : null;
-          if (orijMsg && orijMsg.raw) gonderOpt = { quoted: orijMsg.raw };
+          if (orijMsg) {
+            if (orijMsg.raw && orijMsg.raw.key) {
+              gonderOpt = { quoted: orijMsg.raw };               // tam raw var (en iyi)
+              console.log('   ↩️  medya yaniti: tam raw ile alinti hazir');
+            } else {
+              const quotedMsg = insaQuotedMesaj(orijMsg);        // raw yok -> key'den insa et
+              if (quotedMsg) {
+                gonderOpt = { quoted: quotedMsg };
+                console.log('   ↩️  medya yaniti: key’den alinti insa edildi');
+              } else {
+                console.log('   ⚠️  medya yaniti: alinti insa edilemedi -> alintisiz gonderiliyor');
+              }
+            }
+          }
         } catch (e) { /* yanit bulunamazsa normal gonder */ }
       }
       const gonderP = upSock.sendMessage(jid, waMsg, gonderOpt);
@@ -886,6 +900,17 @@ app.post('/upload', express.raw({ type: '*/*', limit: '64mb' }), async (req, res
     }
     console.log(`✅ Dosya gonderildi: ${fileName} (${boyutMB} MB)`);
 
+    // YANIT önizlemesi: medya bir mesaja yanıt olarak gittiyse, panelde de "yanıt: ..." görünsün.
+    let medyaReplyTo = null;
+    if (replyId) {
+      try {
+        const C3 = hatChats(upLineId);
+        const chat3 = C3 && C3.get ? C3.get(jid) : null;
+        const orij = chat3 && chat3.messages ? chat3.messages.find(x => x && x.id === replyId) : null;
+        if (orij) medyaReplyTo = { sender: orij.fromMe ? 'Siz' : (orij.sender || ''), text: replyPreview(orij) };
+      } catch (e) {}
+    }
+
     addMessage(jid, {
       id: sent.key.id, key: sent.key,
       raw: sent, // kendi gonderdigimiz medyayi sonradan yanitlayabilmek icin
@@ -895,6 +920,7 @@ app.post('/upload', express.raw({ type: '*/*', limit: '64mb' }), async (req, res
       fileName: kind === 'document' ? fileName : undefined,
       mime: mime,
       mediaUrl: webPath, sender: agent, time: nowTime(),
+      replyTo: medyaReplyTo, // panelde yanıt önizlemesi
       durum: 2, // gonderildi (tek tik)
     }, {}, upLineId);
 
@@ -2053,7 +2079,17 @@ wss.on('connection', (ws) => {
         }
       }
 
-      // SONSUZ SCROLL: panel en yukari kayinca "daha eski mesaj getir" der.
+      // MESAJ İÇERİĞİNDE ARAMA (WhatsApp gibi): panel kelime yollar, DB'de mesajlarda arar.
+      // Eşleşen sohbet jid'lerini + özet döner; panel bunları arama sonucuna ekler.
+      else if (msg.type === 'searchMessages') {
+        const kelime = (msg.q || '').trim();
+        if (kelime.length >= 2 && db.isReady()) {
+          const sonuc = await db.searchMessages(kelime, _LID, 40);
+          ws.send(JSON.stringify({ type: 'searchMessagesResult', q: kelime, sonuclar: sonuc }));
+        } else {
+          ws.send(JSON.stringify({ type: 'searchMessagesResult', q: kelime, sonuclar: [] }));
+        }
+      }
       // beforeTs'ten ESKI mesajlari DB'den cekip panele AYRI gonderir (ustetune eklenir).
       else if (msg.type === 'loadOlder') {
         const chat = C.get(msg.jid);

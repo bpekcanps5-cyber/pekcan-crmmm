@@ -2277,9 +2277,22 @@ function connect(){
     // HAT KIMLIGI: bu panel hangi hatta (ofis/pazarlama) bagli — sunucu buna gore
     // SADECE bu hattin sohbetlerini/mesajlarini gonderir (izolasyon).
     if(authToken) ws.send(JSON.stringify({type:'merhaba', token:authToken}));
+    // ── HEARTBEAT (ping): her 25sn'de bir kucuk sinyal gonder ki Nginx/internet
+    //    altyapisi "bu baglanti olu" deyip KESMESIN. "Gelgitli baglanti"nin ana sebebi buydu. ──
+    if(_pingTimer) clearInterval(_pingTimer);
+    _pingTimer=setInterval(()=>{
+      if(ws && ws.readyState===WebSocket.OPEN){
+        try{ ws.send(JSON.stringify({type:'ping'})); }catch(e){}
+      }
+    }, 25000);
   };
-  ws.onclose=()=>{ setConnected(false); setTimeout(connect,2000); };
+  ws.onclose=()=>{
+    setConnected(false);
+    if(_pingTimer){ clearInterval(_pingTimer); _pingTimer=null; }
+    setTimeout(connect,2000);
+  };
 }
+let _pingTimer=null;
 // Senkron durumu: gruplar/sohbetler cekilince gosterge guncellenir
 function handleSyncStatus(d){
   const p=document.getElementById('connPill');

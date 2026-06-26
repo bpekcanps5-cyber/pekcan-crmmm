@@ -1023,6 +1023,13 @@ wss.on('connection', (ws) => {
     try {
       const msg = JSON.parse(raw);
 
+      // HEARTBEAT: panel her 25sn'de "ping" yollar; "pong" doneriz. Bu, panel-sunucu
+      // arasindaki baglantiyi canli tutar (Nginx/internet "olu" deyip kesmesin).
+      if (msg.type === 'ping') {
+        try { ws.send(JSON.stringify({ type: 'pong' })); } catch (e) {}
+        return;
+      }
+
       // PANEL KIMLIGI: panel baglaninca token'iyla "merhaba" der, biz hattini buluruz.
       // Boylece bu ws'e SADECE kendi hattinin mesajlari gider (izolasyon).
       if (msg.type === 'merhaba') {
@@ -3234,7 +3241,7 @@ async function saveMedia(m, kind, sock = waSock) {
 
 // ---- WhatsApp baglantisi ----
 let _waStarting = false;
-let _reconnectGecikme = 3000; // gecici kopmada yeniden baglanma beklemesi (backoff ile artar)
+let _reconnectGecikme = 1500; // ilk gecici kopmada hizli baglan (1.5sn); ust uste koparsa backoff ile artar
 // startWA(lineId): bir HATTI baslatir. Varsayilan 'ofis' (geriye uyumlu).
 // Her hat kendi auth klasorunu (auth/<lineId>) ve kendi line objesini kullanir.
 async function startWA(lineId = 'ofis') {
@@ -3276,10 +3283,12 @@ async function startWA(lineId = 'ofis') {
       return undefined; // bulunamazsa undefined (Baileys bos mesajla devam eder, kopmaz)
     },
     retryRequestDelayMs: 350,       // retry istekleri arasi bekleme (cok hizli retry WhatsApp'i kizdirir)
-    maxMsgRetryCount: 3,            // bir mesaj icin en fazla 3 retry (sonsuz retry dongüsünü onler)
-    connectTimeoutMs: 60000,        // baglanti kurma zaman asimi (yavas agda kopmasin)
-    keepAliveIntervalMs: 15000,     // 15 sn'de bir "hayatta miyim" sinyali -> olu baglanti erken yakalanir
+    maxMsgRetryCount: 5,            // bir mesaj icin en fazla 5 retry (3'ten artirildi — gecici ag sorunlarinda mesaj dusurmesin)
+    connectTimeoutMs: 90000,        // baglanti kurma zaman asimi 90sn (yavas/dalgali agda erken pes etmesin)
+    keepAliveIntervalMs: 25000,     // 25 sn'de bir "hayatta miyim" (WhatsApp Web standardi ~30sn; 15sn cok sikti, bazen ters tepiyordu)
+    defaultQueryTimeoutMs: 90000,   // sorgu zaman asimi 90sn (varsayilan 60sn bazen yavas yanitta kopmaya yol aciyordu)
     emitOwnEvents: false,           // kendi gonderdigimiz mesajlari geri event olarak alma (gereksiz yuk)
+    qrTimeout: 60000,               // QR gecerlilik suresi (cok kisa olunca surekli yeni QR uretip baglantiyi mesgul ediyordu)
   });
   line.sock = sock;   // hattin kendi soketi (HER hat icin dogru — bunu kullan)
   // KRITIK: global 'waSock' koprusu SADECE ofis hatti icin guncellensin.
@@ -3324,7 +3333,7 @@ async function startWA(lineId = 'ofis') {
         lastQR = null;
         myNumber = buNumara; myLID = buLID;
       }
-      _reconnectGecikme = 3000;
+      _reconnectGecikme = 1500;
       console.log(`\n✅ WhatsApp baglandi (hat: ${lineId})! Panel: http://localhost:${PORT}\n`);
       console.log(`   👤 numaram: ${buNumara}${buLID ? ' | LID: ' + buLID : ''}`);
       broadcastHat(lineId, { type: 'status', connected: true, myJid, myName });
@@ -3438,7 +3447,7 @@ async function startWA(lineId = 'ofis') {
         } catch (e) { console.error('   auth temizlenemedi:', e.message); }
         if (lineId === 'ofis') { myNumber = null; myLID = null; lastQR = null; }
         line.myNumber = null; line.myLID = null; line.lastQR = null;
-        _reconnectGecikme = 3000;
+        _reconnectGecikme = 1500;
         // panele bildir: baglanti gitti, yeni QR geliyor
         broadcastHat(lineId, { type: 'status', connected: false, loggedOut: true });
         if (!line.manualLogout) setTimeout(() => startWA(lineId), 2000); // bu HATTI yeniden baslat

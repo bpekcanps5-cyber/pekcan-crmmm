@@ -1895,7 +1895,7 @@
 const avatarColors=['#6a4c93','#1982c4','#8ac926','#ff924c','#ff595e','#1d9e75','#c77dff','#0fa3b1'];
 function colorFor(n){let s=0;for(const c of n)s+=c.charCodeAt(0);return avatarColors[s%avatarColors.length];}
 function initials(n){const p=n.trim().split(/\s+/);return((p[0]?.[0]||'')+(p[1]?.[0]||'')).toUpperCase();}
-function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
 // Toast bildirim (ekran altinda kisa mesaj)
 let toastTimer=null;
 function showToast(msg){
@@ -3771,7 +3771,7 @@ function previewText(c){
   const last=c.messages[c.messages.length-1];
   if(!last)return'';
   const who=(c.isGroup&&!last.fromMe&&last.sender)?last.sender+': ':(last.fromMe?'Siz: ':'');
-  let body=last.text;
+  let body=last.text||''; // undefined gelirse boş (sol listede "undefined" yazmasın)
   if(last.deleted)body=last.silenKisi?('🚫 '+last.silenKisi+' sildi'):'🚫 Bu mesaj silindi';
   else if(last.kind==='undecryptable')body='🔒 Şifrelenemeyen mesaj';
   else if(last.kind==='image')body='📷 Fotoğraf'+(last.text?' '+last.text:'');
@@ -3781,7 +3781,7 @@ function previewText(c){
   else if(last.kind==='sticker')body='Çıkartma';
   else if(last.kind==='contact')body='👤 '+(last.contact?.name||'Kişi');
   else if(last.kind==='contacts')body='👤 '+(last.contacts?.length||0)+' kişi';
-  return who+body;
+  return who+(body||'');
 }
 // avatar HTML'i: foto varsa arka plan resmi, yoksa bas harfler
 function avatarHtml(c){
@@ -4172,7 +4172,7 @@ function scrollToLastMention(c){
 }
 
 function hlight(text, q, mentions){
-  let e=esc(text);
+  let e=esc(text==null?'':text);
   // arama vurgusu
   if(q){
     try{
@@ -4807,7 +4807,7 @@ function renderMessages(c, searchQ){
         return b;
       }).join('');
     } else {
-      body='<span class="msg-text">'+hlight(m.text,searchQ,m.mentions)+'</span>';
+      body='<span class="msg-text">'+hlight(m.text||'',searchQ,m.mentions)+'</span>';
     }
     const editedTag = m.edited ? '<span class="edited-tag">düzenlendi</span>' : '';
     // reaksiyon: karsi tarafin (m.reaction) veya bizim (m.myReaction)

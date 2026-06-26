@@ -3040,9 +3040,13 @@ function describeMessage(m) {
     'secretEncryptedMessage',
   ];
   if (keys.length === 0 || skipTypes.includes(realType)) {
+    // TESHIS: boş mesaj mı yoksa bilinen teknik mesaj mı? (kaçan mesajı yakalamak için)
+    if (keys.length === 0) {
+      console.log('⚠️  BOŞ MESAJ (decrypt henüz olmamış olabilir) — messages.update ile düzeltme beklenecek');
+    }
     return { kind: 'skip' };
   }
-  console.log('⚠️  Desteklenmeyen mesaj. Bulunan alanlar:', JSON.stringify(keys));
+  console.log('⚠️  DESTEKLENMEYEN MESAJ TİPİ:', JSON.stringify(keys), '| realType:', realType);
   // Sifreleme/anahtar sorunu olan mesajlar icin kullanici dostu aciklama
   return { kind: 'undecryptable', text: 'Bu mesajın şifresi çözülemedi. Gönderenin mesajı tekrar göndermesini isteyebilirsin.' };
 }

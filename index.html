@@ -454,6 +454,16 @@
   .iup-item{display:flex;align-items:center;gap:12px;padding:9px 11px;border-radius:10px;cursor:pointer;transition:background .12s}
   .iup-item:hover{background:var(--brand-soft)}
   .list-section{font-size:10.5px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.8px;padding:14px 12px 6px}
+  /* ── MESAJ ARAMA SONUÇLARI (WhatsApp gibi "Mesajlar" bölümü) ── */
+  .chat.msg-sonuc .chat-preview{color:var(--muted)}
+  /* aranan kelime vurgusu (sarı/yeşil highlight) */
+  mark.arama-vurgu{background:color-mix(in srgb,var(--brand) 40%,transparent);color:var(--text);padding:0 2px;border-radius:3px;font-weight:700}
+  /* mesaja zıplayınca kısa parlama */
+  .msg.mesaj-vurgu{animation:mesajParla 2.2s ease}
+  @keyframes mesajParla{
+    0%,100%{background:initial}
+    15%,55%{box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 55%,transparent), 0 0 18px color-mix(in srgb,var(--brand) 35%,transparent)}
+  }
   .chat{display:flex;gap:14px;padding:12px 13px;cursor:pointer;border-radius:15px;position:relative;margin-bottom:3px;transition:all .18s cubic-bezier(.2,.8,.2,1)}
   .chat:hover{background:var(--panel-2)}
   .chat.active{background:var(--brand-soft);box-shadow:var(--shadow-xs)}
@@ -2072,14 +2082,14 @@ function connect(){
       if(activeJid&&chats[activeJid]) updateConvHeader(chats[activeJid], activeJid);
     }
     else if(d.type==='searchMessagesResult'){
-      // MESAJ İÇERİĞİNDE ARAMA sonucu geldi. Sadece güncel arama kelimesiyle eşleşiyorsa uygula
-      // (eski/yavaş gelen sonuç güncel aramayı bozmasın).
+      // MESAJ ARAMA sonucu. Güncel kelimeyle eşleşiyorsa uygula (eski sonuç bozmasın).
       if((searchTerm||'').trim().toLocaleLowerCase('tr') !== (d.q||'').toLocaleLowerCase('tr')) return;
       _mesajAramaSonuc={};
-      for(const s of (d.sonuclar||[])){
-        _mesajAramaSonuc[s.chatJid]={eslesme:s.eslesme, sonText:s.sonText};
+      for(const s of (d.sohbetler||[])){
+        _mesajAramaSonuc[s.chatJid]={eslesme:s.eslesme};
       }
-      renderList(); // sohbet içinde eşleşenler de listeye girsin
+      _mesajAramaListesi = d.mesajlar||[];  // WhatsApp gibi "Mesajlar" başlığı altında listelenecek
+      renderList();
     }
     else if(d.type==='olderMessages'){
       // SONSUZ SCROLL: daha eski mesajlar geldi -> sohbetin BAŞINA ekle, scroll'u koru.
@@ -3771,6 +3781,16 @@ _renderListRaw=function(){
   if(_listTruncated){
     html+='<div style="padding:18px 16px;text-align:center;color:var(--faint);font-size:12.5px;line-height:1.5">Son '+LIST_LIMIT+' sohbet gösteriliyor.<br>Diğerlerini bulmak için yukarıdan <b>aratın</b>.</div>';
   }
+  // ── WhatsApp gibi "MESAJLAR" bölümü: arama yapılırken eşleşen mesajları ayrı listele ──
+  if(searchTerm && searchTerm.trim().length>=2){
+    // sohbet bölümü başlığı (mesaj bölümünden ayırmak için)
+    if(vis.length) html='<div class="list-section">Sohbetler</div>'+html;
+    if(_mesajAramaListesi && _mesajAramaListesi.length){
+      const kelime=searchTerm.trim();
+      html+='<div class="list-section">Mesajlar</div>';
+      html+=_mesajAramaListesi.map(m=>mesajSonucRow(m, kelime)).join('');
+    }
+  }
   list.innerHTML=html;
   if(!vis.length) list.innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--faint);font-size:13px">'+(currentFilter==='archived'?'Arsivde sohbet yok.':(searchTerm?'Sonuç bulunamadı.':'Henuz mesaj yok.<br>Birinden mesaj gelince burada gorunecek.'))+'</div>';
   // SAYAÇLAR: tek geciste hesapla (eskiden chatArray()+filter 7-8 kez cagriliyordu -> yavaslik).
@@ -3819,8 +3839,44 @@ function chatRow(c){
   </div>`;
 }
 
-// ---- Baglam menusu (sabitle / arsivle) ----
-const ctxMenu=document.getElementById('ctxMenu');
+// WhatsApp gibi "Mesajlar" bölümündeki bir mesaj sonucu satırı.
+// Tıklayınca o sohbeti açar + o mesaja zıplar.
+function mesajSonucRow(m, kelime){
+  const c=chats[m.chatJid];
+  const grupAd = m.chatName || (c&&c.name) || (m.chatJid||'').split('@')[0];
+  // mesaj metninde aranan kelimeyi vurgula (kalın/renkli)
+  let metin = m.text || '';
+  if(metin.length>90) metin=metin.slice(0,90)+'…';
+  const vurgulu = kelimeVurgula(esc(metin), kelime);
+  // gönderen: kendi mesajımız mı, grupta biri mi
+  const gonderen = m.fromMe ? 'Siz' : (m.sender || '');
+  const av = c ? avatarHtml(c) : '<div class="chat-avatar" style="background:var(--brand)">'+esc((grupAd||'?').slice(0,1).toUpperCase())+'</div>';
+  return '<div class="chat msg-sonuc" onclick="mesajSonucAc(\''+m.chatJid+'\',\''+esc(m.id)+'\')">'+
+    av+
+    '<div class="chat-main">'+
+      '<div class="chat-top"><span class="chat-name">'+esc(grupAd)+'</span><span class="chat-time">'+esc(m.time||'')+'</span></div>'+
+      '<div class="chat-bottom"><span class="chat-preview">'+(gonderen?('<b style="color:var(--muted);font-weight:600">'+esc(gonderen)+':</b> '):'')+vurgulu+'</span></div>'+
+    '</div>'+
+  '</div>';
+}
+// Metinde aranan kelimeyi <mark> ile vurgula (Türkçe duyarsız)
+function kelimeVurgula(metin, kelime){
+  if(!kelime) return metin;
+  try{
+    // Türkçe karaktere duyarsız eşleştirmek zor; basit yaklaşım: kelimeyi olduğu gibi ara (case-insensitive)
+    const escKelime=kelime.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const re=new RegExp('('+escKelime+')','gi');
+    return metin.replace(re,'<mark class="arama-vurgu">$1</mark>');
+  }catch(e){ return metin; }
+}
+// Mesaj sonucuna tıklandı: sohbeti aç + o mesaja zıpla
+function mesajSonucAc(jid, msgId){
+  if(!chats[jid]){ showToast('Sohbet bulunamadı'); return; }
+  openChat(jid);
+  // sohbet açılıp mesajlar render olunca o mesaja kaydır + vurgula (jumpToMsg hazır fonksiyon)
+  setTimeout(()=>jumpToMsg(msgId), 450);
+}
+
 function openCtxMenu(e,jid){
   const isPin=pinned.has(jid), isArch=archived.has(jid);
   ctxMenu.innerHTML=`
@@ -5724,7 +5780,8 @@ document.getElementById('search').addEventListener('input',e=>{
   }
 });
 let _msgSearchTimer=null;
-let _mesajAramaSonuc={}; // jid -> {eslesme, sonText} mesaj içinde eşleşen sohbetler
+let _mesajAramaSonuc={}; // jid -> {eslesme} mesaj içinde eşleşen sohbetler
+let _mesajAramaListesi=[]; // WhatsApp gibi "Mesajlar" başlığı altında gösterilecek eşleşen mesajlar
 // arama temizleme carpisi
 document.getElementById('searchClear').onclick=()=>{
   const inp=document.getElementById('search');

@@ -3792,7 +3792,12 @@ _renderListRaw=function(){
     }
   }
   list.innerHTML=html;
-  if(!vis.length) list.innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--faint);font-size:13px">'+(currentFilter==='archived'?'Arsivde sohbet yok.':(searchTerm?'Sonuç bulunamadı.':'Henuz mesaj yok.<br>Birinden mesaj gelince burada gorunecek.'))+'</div>';
+  // "Sonuç bulunamadı" SADECE hem sohbet hem mesaj sonucu yoksa gösterilsin.
+  // (Eskiden vis.length=0 olunca mesaj sonuçlarını da eziyordu -> mesaj araması görünmüyordu.)
+  const mesajSonucVar = searchTerm && _mesajAramaListesi && _mesajAramaListesi.length>0;
+  if(!vis.length && !mesajSonucVar){
+    list.innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--faint);font-size:13px">'+(currentFilter==='archived'?'Arsivde sohbet yok.':(searchTerm?'Sonuç bulunamadı.':'Henuz mesaj yok.<br>Birinden mesaj gelince burada gorunecek.'))+'</div>';
+  }
   // SAYAÇLAR: tek geciste hesapla (eskiden chatArray()+filter 7-8 kez cagriliyordu -> yavaslik).
   let nAll=0,nGroup=0,nPeople=0,nMention=0,nAssigned=0,nUnread=0;
   const u=currentUser&&currentUser.username;
